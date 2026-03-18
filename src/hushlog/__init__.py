@@ -13,7 +13,9 @@ def patch() -> None:
     Call this once at application startup to automatically redact PII and
     credentials from all log output.  No logger rewrites needed.
     """
+    return None
 
 
 def unpatch() -> None:
     """Remove HushLog's RedactingFormatter wrappers and restore original formatters."""
+    return None

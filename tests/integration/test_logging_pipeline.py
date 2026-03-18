@@ -9,8 +9,12 @@ from __future__ import annotations
 import importlib
 import logging
 import pathlib
+from typing import TYPE_CHECKING
 
 import hushlog
+
+if TYPE_CHECKING:
+    import pytest
 
 
 class TestPackageStructure:
@@ -39,7 +43,7 @@ class TestPackageStructure:
 class TestLoggingPipelineAfterPatch:
     """Ensure patch/unpatch don't break the standard logging pipeline."""
 
-    def test_patch_then_log(self, caplog: logging.LogRecord) -> None:  # type: ignore[type-arg]
+    def test_patch_then_log(self, caplog: pytest.LogCaptureFixture) -> None:
         """Calling patch() then logging should not raise."""
         hushlog.patch()
         try:
@@ -72,7 +76,7 @@ class TestLoggingPipelineAfterPatch:
         finally:
             hushlog.unpatch()
 
-    def test_multiple_log_calls_after_patch(self, caplog: logging.LogRecord) -> None:  # type: ignore[type-arg]
+    def test_multiple_log_calls_after_patch(self, caplog: pytest.LogCaptureFixture) -> None:
         """Multiple log calls at various levels should all succeed after patch."""
         hushlog.patch()
         try:
@@ -105,7 +109,7 @@ class TestUnpatch:
         hushlog.unpatch()
         hushlog.unpatch()
 
-    def test_patch_unpatch_cycle(self, caplog: logging.LogRecord) -> None:  # type: ignore[type-arg]
+    def test_patch_unpatch_cycle(self, caplog: pytest.LogCaptureFixture) -> None:
         """A full patch -> log -> unpatch -> log cycle should work cleanly."""
         logger = logging.getLogger("hushlog.test.cycle")
 
