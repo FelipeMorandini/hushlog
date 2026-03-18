@@ -14,10 +14,10 @@
 - [ ] Basic `README.md` with installation and quickstart
 
 ### 0.1.0-alpha.2: Core Engine
-- [ ] `PatternRegistry` — singleton pattern store with compiled regexes and heuristic pre-checks
-- [ ] `RedactingFormatter(logging.Formatter)` — intercepts `record.msg` and `record.args`
-- [ ] `hushlog.patch()` — zero-config entry point, wraps root logger formatters
-- [ ] `hushlog.unpatch()` — clean teardown for testing and runtime toggling
+- [x] `PatternRegistry` — singleton pattern store with compiled regexes and heuristic pre-checks
+- [x] `RedactingFormatter(logging.Formatter)` — intercepts `record.msg` and `record.args`
+- [x] `hushlog.patch()` — zero-config entry point, wraps root logger formatters
+- [x] `hushlog.unpatch()` — clean teardown for testing and runtime toggling
 
 ### 0.1.0-alpha.3: Basic PII Patterns
 - [ ] Email addresses (RFC 5322 subset with `@` heuristic pre-check)
