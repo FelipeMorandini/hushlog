@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hushlog"
-version = "0.2.0a4"
+version = "0.2.0"
 description = "Zero-config PII redaction for Python logging"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [{name = "Felipe Pires Morandini"}]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
