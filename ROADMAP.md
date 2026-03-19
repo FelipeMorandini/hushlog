@@ -40,13 +40,13 @@
 ## v0.2.0 — Security Expansion
 
 ### 0.2.0-alpha.1: API Key & Token Detection
-- [ ] AWS access keys (`AKIA...`)
-- [ ] AWS secret keys
-- [ ] Stripe keys (`sk_live_...`, `pk_live_...`)
-- [ ] GitHub tokens (`ghp_...`, `gho_...`, `ghs_...`)
-- [ ] GCP API keys
-- [ ] Generic high-entropy secret detection (base64 strings with key-like prefixes)
-- [ ] JWT tokens (three base64 segments separated by dots)
+- [x] AWS access keys (`AKIA...`, `ASIA...`)
+- [x] AWS secret keys (context-dependent, requires label prefix)
+- [x] Stripe keys (`sk_live_...`, `pk_live_...`, `rk_live_...`)
+- [x] GitHub tokens (`ghp_...`, `gho_...`, `ghs_...`, `github_pat_...`)
+- [x] GCP API keys (`AIza...`)
+- [x] Generic high-entropy secret detection (label-based: password, secret, api_key, etc.)
+- [x] JWT tokens (3-5 base64url segments separated by dots)
 
 ### 0.2.0-alpha.2: IPv4 & IPv6 Redaction
 - [ ] IPv4 addresses (with validation, excluding version-number false positives)
