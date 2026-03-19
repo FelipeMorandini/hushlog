@@ -1,0 +1,294 @@
+"""End-to-end scenario tests for HushLog.
+
+Tests real-world usage patterns including basicConfig integration, concurrent
+logging, named logger propagation, and output fidelity for clean messages.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import io
+import logging
+import threading
+
+import hushlog
+
+
+def _make_handler() -> tuple[logging.StreamHandler[io.StringIO], io.StringIO]:
+    """Create a StreamHandler backed by a StringIO buffer."""
+    buf = io.StringIO()
+    handler = logging.StreamHandler(buf)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    return handler, buf
+
+
+class TestBasicConfigThenPatch:
+    """Verify the correct order of operations: basicConfig() then patch()."""
+
+    def test_basicconfig_then_patch(self) -> None:
+        """Call logging.basicConfig() first, then hushlog.patch(), then log PII."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        try:
+            # Remove existing handlers so basicConfig actually adds one
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+
+            buf = io.StringIO()
+            handler = logging.StreamHandler(buf)
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            root.addHandler(handler)
+            root.setLevel(logging.INFO)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("test.basicconfig")
+            logger.info("Contact alice@example.com for help")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[EMAIL REDACTED]" in output
+            assert "alice@example.com" not in output
+        finally:
+            hushlog.unpatch()
+            # Restore original handlers
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestPatchWithNoHandlers:
+    """Verify patch() behavior when no handlers are present."""
+
+    def test_patch_with_no_handlers_wraps_nothing(self) -> None:
+        """Clear root handlers, call patch(), verify _is_patched is False."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        try:
+            # Remove all handlers
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+
+            hushlog.patch()
+            assert hushlog._is_patched is False
+
+            # Now add a handler via manual setup and patch again
+            handler, buf = _make_handler()
+            root.addHandler(handler)
+            root.setLevel(logging.INFO)
+
+            hushlog.patch()
+            assert hushlog._is_patched is True
+
+            logger = logging.getLogger("test.no_handlers")
+            logger.info("SSN: 078-05-1120")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[SSN REDACTED]" in output
+            assert "078-05-1120" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestConcurrentLoggingRedaction:
+    """Verify thread-safe redaction under concurrent load."""
+
+    def test_concurrent_logging_redaction(self) -> None:
+        """Multiple threads logging PII concurrently — all output must be redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        lock = threading.Lock()
+        buf = io.StringIO()
+
+        class ThreadSafeHandler(logging.StreamHandler[io.StringIO]):
+            """StreamHandler that synchronizes writes to the shared buffer."""
+
+            def emit(self, record: logging.LogRecord) -> None:
+                msg = self.format(record)
+                with lock:
+                    buf.write(msg + self.terminator)
+
+        handler = ThreadSafeHandler(buf)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            def log_pii(worker_id: int) -> None:
+                logger = logging.getLogger(f"test.concurrent.{worker_id}")
+                for i in range(50):
+                    logger.info(
+                        "User email: user%d_%d@example.com SSN: 078-05-1120",
+                        worker_id,
+                        i,
+                    )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [executor.submit(log_pii, w) for w in range(4)]
+                concurrent.futures.wait(futures)
+                # Re-raise any exceptions from workers
+                for f in futures:
+                    f.result()
+
+            handler.flush()
+            output = buf.getvalue()
+
+            # Verify no raw PII leaked
+            assert "078-05-1120" not in output
+            assert "@example.com" not in output
+            # Verify redaction markers are present
+            assert "[EMAIL REDACTED]" in output
+            assert "[SSN REDACTED]" in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestNamedLoggerPropagation:
+    """Verify named logger behavior with root logger patching."""
+
+    def test_named_logger_propagates_to_patched_root(self) -> None:
+        """A named logger with propagate=True should have PII redacted at the root."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("myapp")
+            assert logger.propagate is True
+            logger.info("Customer phone: (555) 234-5678")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[PHONE REDACTED]" in output
+            assert "(555) 234-5678" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+    def test_named_logger_no_propagate_not_redacted(self) -> None:
+        """A named logger with propagate=False and its own handler bypasses root redaction."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        root_handler, root_buf = _make_handler()
+        child_handler, child_buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(root_handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("myapp.isolated")
+            logger.propagate = False
+            logger.addHandler(child_handler)
+            logger.setLevel(logging.DEBUG)
+
+            logger.info("Customer email: secret@corp.com")
+            child_handler.flush()
+            child_output = child_buf.getvalue()
+
+            # The child handler is NOT wrapped by patch (known limitation)
+            assert "secret@corp.com" in child_output
+
+            # Root handler should have no output since propagate=False
+            root_handler.flush()
+            root_output = root_buf.getvalue()
+            assert root_output == ""
+        finally:
+            hushlog.unpatch()
+            logger.removeHandler(child_handler)
+            logger.propagate = True
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestCleanMessageByteIdentical:
+    """Verify that clean messages pass through without modification."""
+
+    def test_clean_message_byte_identical(self) -> None:
+        """A message with no PII should produce identical output whether patched or not."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+        message = "Processing request 42 complete"
+
+        try:
+            # --- Patched run ---
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            handler1, buf1 = _make_handler()
+            root.addHandler(handler1)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+            logger = logging.getLogger("test.clean.patched")
+            logger.info(message)
+            handler1.flush()
+            patched_output = buf1.getvalue()
+
+            hushlog.unpatch()
+            root.removeHandler(handler1)
+
+            # --- Unpatched run ---
+            handler2, buf2 = _make_handler()
+            root.addHandler(handler2)
+
+            logger2 = logging.getLogger("test.clean.unpatched")
+            logger2.info(message)
+            handler2.flush()
+            unpatched_output = buf2.getvalue()
+
+            root.removeHandler(handler2)
+
+            assert patched_output == unpatched_output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)

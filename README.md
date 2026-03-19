@@ -9,11 +9,11 @@ Zero-config PII redaction for Python logging.
 
 ## Features
 
-- **Zero-config** — one call to `hushlog.patch()` and you're done
-- **Non-invasive** — wraps existing formatters, no logger rewrites needed
-- **Performant** — pre-compiled regex with heuristic early-exit checks
-- **Type-safe** — fully typed with PEP 561 `py.typed` marker
-- **Python 3.10+** — supports Python 3.10 through 3.13
+- **Zero-config** -- one call to `hushlog.patch()` and you're done
+- **Non-invasive** -- wraps existing formatters, no logger rewrites needed
+- **Performant** -- pre-compiled regex with heuristic early-exit checks
+- **Type-safe** -- fully typed with PEP 561 `py.typed` marker
+- **Python 3.10+** -- supports Python 3.10 through 3.13
 
 ## Installation
 
@@ -33,9 +33,10 @@ uv add hushlog
 import logging
 import hushlog
 
+# Configure logging FIRST, then patch
+logging.basicConfig(level=logging.INFO)
 hushlog.patch()
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 logger.info("User email: john@example.com")
@@ -43,26 +44,27 @@ logger.info("User email: john@example.com")
 
 logger.info("Card: 4111-1111-1111-1111")
 # Output: Card: [CREDIT_CARD REDACTED]
+
+logger.info("SSN: 123-45-6789")
+# Output: SSN: [SSN REDACTED]
 ```
+
+## How It Works
+
+HushLog wraps your existing logging formatters with a `RedactingFormatter` that scans the final formatted string for PII patterns. It never replaces loggers or handlers -- your existing `logger.info()` calls remain unchanged. All regex patterns are pre-compiled at import time with lightweight heuristic pre-checks to minimize overhead on the hot logging path.
 
 ## What Gets Redacted
 
-| Pattern      | Example Input             | Redacted Output          |
-| ------------ | ------------------------- | ------------------------ |
-| Email        | `john@example.com`        | `[EMAIL REDACTED]`       |
-| Credit Card  | `4111-1111-1111-1111`     | `[CREDIT_CARD REDACTED]` |
-| SSN          | `123-45-6789`             | `[SSN REDACTED]`         |
-| Phone        | `(555) 123-4567`          | `[PHONE REDACTED]`       |
-
-Credit card detection includes Luhn checksum validation to minimize false positives.
-
-## Planned Patterns (v0.2.0+)
-
-IPv4/IPv6 addresses, AWS keys, Stripe keys, GitHub tokens, JWT tokens, and more. See the [roadmap](ROADMAP.md) for details.
+| Pattern | Example | Output | Notes |
+| --- | --- | --- | --- |
+| Email | `john@example.com` | `[EMAIL REDACTED]` | RFC 5322 subset, `@` heuristic pre-check |
+| Credit Card | `4111-1111-1111-1111` | `[CREDIT_CARD REDACTED]` | Luhn validated, supports spaces/dashes |
+| SSN | `123-45-6789` | `[SSN REDACTED]` | Dashed format only, invalid ranges excluded |
+| Phone | `(555) 123-4567` | `[PHONE REDACTED]` | US NANP, multiple formats |
 
 ## Configuration
 
-Disable specific patterns or add custom ones:
+Disable specific built-in patterns or add custom ones:
 
 ```python
 from hushlog import Config
@@ -72,6 +74,29 @@ hushlog.patch(Config(
     custom_patterns={"internal_id": r"ID-[A-Z]{3}-[0-9]{6}"},
 ))
 ```
+
+> **Note:** The `mask_style` option for partial masking (e.g., `j***@example.com`) is planned for v0.2.0.
+
+## Teardown
+
+Call `unpatch()` to remove HushLog's formatter wrappers and restore the original formatters. This is useful for testing or runtime toggling:
+
+```python
+hushlog.unpatch()
+```
+
+Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()` multiple times is also safe (idempotent).
+
+## Limitations
+
+- Only handlers present on the **root logger** at `patch()` time are wrapped. Handlers added later will not be redacted.
+- Named loggers with `propagate=False` and their own handlers bypass root-level redaction.
+- No structured log support yet (structlog/loguru integrations planned for v0.3.0).
+- Phone detection is US NANP only.
+
+## Planned
+
+IPv4/IPv6 addresses, AWS keys, Stripe keys, GitHub tokens, JWT tokens, partial masking, and more. See the [roadmap](ROADMAP.md) for details.
 
 ## Contributing
 
