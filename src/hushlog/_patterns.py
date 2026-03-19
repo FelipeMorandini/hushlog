@@ -41,6 +41,49 @@ def _ipv4_validate(text: str) -> bool:
     return True
 
 
+def _cpf_validate(text: str) -> bool:
+    """Validate a Brazilian CPF number using check digit algorithm."""
+    digits = [int(c) for c in text if c in _ASCII_DIGITS]
+    if len(digits) != 11:
+        return False
+    # Reject all-same-digit CPFs (e.g., 111.111.111-11)
+    if len(set(digits)) == 1:
+        return False
+    # First check digit
+    total = sum(d * w for d, w in zip(digits[:9], range(10, 1, -1), strict=False))
+    remainder = total % 11
+    check1 = 0 if remainder < 2 else 11 - remainder
+    if digits[9] != check1:
+        return False
+    # Second check digit
+    total = sum(d * w for d, w in zip(digits[:10], range(11, 1, -1), strict=False))
+    remainder = total % 11
+    check2 = 0 if remainder < 2 else 11 - remainder
+    return digits[10] == check2
+
+
+def _cnpj_validate(text: str) -> bool:
+    """Validate a Brazilian CNPJ number using check digit algorithm."""
+    digits = [int(c) for c in text if c in _ASCII_DIGITS]
+    if len(digits) != 14:
+        return False
+    if len(set(digits)) == 1:
+        return False
+    # First check digit
+    weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    total = sum(d * w for d, w in zip(digits[:12], weights1, strict=False))
+    remainder = total % 11
+    check1 = 0 if remainder < 2 else 11 - remainder
+    if digits[12] != check1:
+        return False
+    # Second check digit
+    weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    total = sum(d * w for d, w in zip(digits[:13], weights2, strict=False))
+    remainder = total % 11
+    check2 = 0 if remainder < 2 else 11 - remainder
+    return digits[13] == check2
+
+
 def _ipv6_validate(text: str) -> bool:
     """Validate an IPv6 address using the standard library."""
     try:
@@ -132,6 +175,27 @@ def _partial_mask_ipv6(m: re.Match[str], mc: str) -> str:
     text = m.group()
     first_group = text.split(":")[0] if ":" in text else text
     return f"{first_group}:{mc * 4}:{mc * 4}:{mc * 4}"
+
+
+def _partial_mask_cpf(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    last2 = text[-2:]
+    return f"{mc * 3}.{mc * 3}.{mc * 3}-{last2}"
+
+
+def _partial_mask_cnpj(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    # Show branch (4 digits after /) and check digits (last 2)
+    digits = [c for c in text if c in _ASCII_DIGITS]
+    branch = "".join(digits[8:12])
+    check = "".join(digits[12:14])
+    return f"{mc * 2}.{mc * 3}.{mc * 3}/{branch}-{check}"
+
+
+def _partial_mask_br_phone(m: re.Match[str], mc: str) -> str:
+    digits = [c for c in m.group() if c in _ASCII_DIGITS]
+    last4 = "".join(digits[-4:])
+    return f"({mc * 2}) {mc * 5}-{last4}"
 
 
 def _partial_mask_generic_secret(m: re.Match[str], mc: str) -> str:
@@ -393,6 +457,67 @@ _IPV6 = PatternEntry(
 )
 
 
+# --- CPF (Brazilian Individual Taxpayer ID) ---
+# Matches XXX.XXX.XXX-XX format only (formatted with dots and dash).
+# Uses check digit validation (mod-11 algorithm).
+_CPF_RE = re.compile(
+    r"(?<![0-9])"
+    r"[0-9]{3}\.[0-9]{3}\.[0-9]{3}-[0-9]{2}"
+    r"(?![0-9])"
+)
+
+_CPF = PatternEntry(
+    name="cpf",
+    regex=_CPF_RE,
+    heuristic=lambda text: "." in text and "-" in text,
+    mask="[CPF REDACTED]",
+    validator=_cpf_validate,
+    partial_masker=_partial_mask_cpf,
+)
+
+
+# --- CNPJ (Brazilian Company Taxpayer ID) ---
+# Matches XX.XXX.XXX/XXXX-XX format only (formatted with dots, slash, dash).
+# Uses check digit validation (mod-11 algorithm).
+_CNPJ_RE = re.compile(
+    r"(?<![0-9])"
+    r"[0-9]{2}\.[0-9]{3}\.[0-9]{3}/[0-9]{4}-[0-9]{2}"
+    r"(?![0-9])"
+)
+
+_CNPJ = PatternEntry(
+    name="cnpj",
+    regex=_CNPJ_RE,
+    heuristic=lambda text: "/" in text,
+    mask="[CNPJ REDACTED]",
+    validator=_cnpj_validate,
+    partial_masker=_partial_mask_cnpj,
+)
+
+
+# --- Brazilian Phone ---
+# Matches formatted Brazilian phone numbers with area code in parentheses.
+# Mobile: (XX) 9XXXX-XXXX, Landline: (XX) XXXX-XXXX
+# Optional +55 country code prefix.
+_BR_PHONE_RE = re.compile(
+    r"(?<![0-9])"
+    r"(?:\+55[\s.-]?)?"  # Optional country code
+    r"\([1-9][0-9]\)[\s.-]?"  # Area code (11-99)
+    r"(?:9[0-9]{4}|[2-9][0-9]{3})"  # Mobile (9XXXX) or landline (2-9XXX)
+    r"[\s.-]?"
+    r"[0-9]{4}"  # Last 4 digits
+    r"(?![0-9])"
+)
+
+_BR_PHONE = PatternEntry(
+    name="br_phone",
+    regex=_BR_PHONE_RE,
+    heuristic=lambda text: "(" in text,
+    mask="[BR_PHONE REDACTED]",
+    partial_masker=_partial_mask_br_phone,
+)
+
+
 # --- Generic Secret ---
 # Context-dependent: matches values after common secret-related labels.
 # Replaces the entire match (label + value) to avoid leaking context.
@@ -438,6 +563,7 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
     Order rationale:
     - Specific patterns with fixed prefixes (credit_card, ssn, API keys) first
     - IPv6 before IPv4 to catch ::ffff:x.x.x.x mapped addresses first
+    - CPF/CNPJ/BR phone after IPv4 — formatted with check digits, specific enough
     - Context-dependent patterns (generic_secret) before general patterns (email)
       because email redaction inserts spaces that break generic_secret's ``\\S{8,128}``
     - Broadest patterns (email, phone) last to avoid consuming text needed by
@@ -454,6 +580,9 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
         _GCP_KEY,
         _IPV6,
         _IPV4,
+        _CPF,
+        _CNPJ,
+        _BR_PHONE,
         _GENERIC_SECRET,
         _EMAIL,
         _PHONE,
