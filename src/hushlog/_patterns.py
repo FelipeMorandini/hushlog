@@ -28,6 +28,7 @@ def _luhn_check(text: str) -> bool:
 # Matches 13-19 digit sequences with optional separators (space, dash)
 # Prefix-aware: Visa (4), MasterCard (5[1-5], 2[2-7]), Amex (3[47]), Discover (6011, 65, 644-649)
 # Uses [0-9] instead of \d to prevent Unicode digit bypass.
+# Luhn validator handles final length and checksum verification.
 _CREDIT_CARD_RE = re.compile(
     r"\b"
     r"(?:"
@@ -37,9 +38,7 @@ _CREDIT_CARD_RE = re.compile(
     r"3[47][0-9]{2}|"  # Amex
     r"6(?:011|5[0-9]{2}|4[4-9][0-9])"  # Discover
     r")"
-    r"[\s-]?[0-9]{3,4}"
-    r"[\s-]?[0-9]{3,4}"
-    r"[\s-]?[0-9]{3,5}"
+    r"(?:[\s-]?[0-9]{1,6}){2,5}"  # Remaining digit groups with optional separators
     r"\b"
 )
 

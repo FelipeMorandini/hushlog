@@ -69,7 +69,7 @@ from hushlog import Config
 
 hushlog.patch(Config(
     disable_patterns=frozenset({"phone"}),
-    custom_patterns={"internal_id": r"ID-[A-Z]{3}-\d{6}"},
+    custom_patterns={"internal_id": r"ID-[A-Z]{3}-[0-9]{6}"},
 ))
 ```
 

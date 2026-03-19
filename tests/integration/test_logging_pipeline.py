@@ -447,6 +447,7 @@ class TestPIIRedactionThroughPipeline:
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -460,12 +461,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_multi_pii_redaction(self) -> None:
         """A single log message with email, SSN, and phone is fully redacted."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -483,12 +486,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_credit_card_luhn_valid_redacted(self) -> None:
         """A valid credit card number (passes Luhn) is redacted through the pipeline."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -503,12 +508,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_credit_card_luhn_invalid_not_redacted(self) -> None:
         """An invalid credit card number (fails Luhn) is NOT redacted."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -523,12 +530,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_disable_patterns_skips_email(self) -> None:
         """disable_patterns={'email'} leaves emails unredacted but still redacts SSN."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -547,12 +556,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_custom_pattern_overrides_builtin(self) -> None:
         """A custom 'email' pattern replaces the builtin email regex."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -579,12 +590,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_percent_style_formatting_with_pii(self) -> None:
         """%-style formatting (logger.info('...%s', arg)) redacts PII in the formatted output."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -598,12 +611,14 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
 
     def test_fstring_with_credit_card(self) -> None:
         """An f-string containing a credit card number is redacted in the output."""
         root = logging.getLogger()
         handler, buf = self._make_handler()
         root.addHandler(handler)
+        original_level = root.level
         root.setLevel(logging.DEBUG)
 
         try:
@@ -618,3 +633,4 @@ class TestPIIRedactionThroughPipeline:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+            root.setLevel(original_level)
