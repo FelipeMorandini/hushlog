@@ -26,7 +26,8 @@ classifiers = [
 keywords = ["logging", "pii", "redaction", "security", "privacy"]
 
 [project.urls]
-Homepage = "https://github.com/FelipeMorandini/hushlog"
+Homepage = "https://felipemorandini.github.io/hushlog/"
+Documentation = "https://felipemorandini.github.io/hushlog/"
 Repository = "https://github.com/FelipeMorandini/hushlog"
 Issues = "https://github.com/FelipeMorandini/hushlog/issues"
 
