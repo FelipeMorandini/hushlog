@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import logging
 import threading
+import weakref
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hushlog._config import Config
 
-__version__ = "1.0.0rc1"
+__version__ = "1.0.0rc2"
 
 __all__ = [
     "Config",
@@ -21,7 +22,9 @@ __all__ = [
     "unpatch",
 ]
 
-_patched_formatters: dict[int, logging.Formatter | None] = {}
+_patched_formatters: weakref.WeakKeyDictionary[logging.Handler, logging.Formatter | None] = (
+    weakref.WeakKeyDictionary()
+)
 _is_patched: bool = False
 _patch_lock = threading.Lock()
 
@@ -53,8 +56,7 @@ def patch(config: Config | None = None) -> None:
 
         wrapped = False
         for handler in logging.root.handlers:
-            handler_id = id(handler)
-            _patched_formatters[handler_id] = handler.formatter
+            _patched_formatters[handler] = handler.formatter
             handler.setFormatter(RedactingFormatter(handler.formatter, registry))
             wrapped = True
 
@@ -71,9 +73,8 @@ def unpatch() -> None:
             return None
 
         for handler in logging.root.handlers:
-            handler_id = id(handler)
-            if handler_id in _patched_formatters:
-                handler.setFormatter(_patched_formatters[handler_id])
+            if handler in _patched_formatters:
+                handler.setFormatter(_patched_formatters[handler])
 
         _patched_formatters.clear()
         _is_patched = False

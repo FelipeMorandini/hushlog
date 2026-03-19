@@ -25,8 +25,17 @@ class RedactingFormatter(logging.Formatter):
             result = self._base_formatter.format(record)
         else:
             result = logging.Formatter.format(self, record)
+
+        # Redact exc_text if the base formatter cached it on the record
+        original_exc_text = record.exc_text
+        if record.exc_text is not None:
+            record.exc_text = self._registry.redact(record.exc_text)
+
         try:
             return self._registry.redact(result)
         except Exception:
             _logger.debug("Redaction failed, returning unredacted output", exc_info=True)
             return result
+        finally:
+            # Restore original exc_text to avoid permanent mutation
+            record.exc_text = original_exc_text

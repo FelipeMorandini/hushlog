@@ -49,6 +49,12 @@ class PatternRegistry:
 
     def register(self, entry: PatternEntry) -> None:
         """Register a redaction pattern."""
+        # Validate mask doesn't contain invalid backreferences
+        try:
+            entry.regex.sub(entry.mask, "")
+        except re.error as exc:
+            msg = f"Invalid mask for pattern {entry.name!r}: {exc}"
+            raise ValueError(msg) from exc
         self._patterns[entry.name] = entry
 
     def unregister(self, name: str) -> None:

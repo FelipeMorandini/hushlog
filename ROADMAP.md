@@ -105,11 +105,11 @@
 - [x] Unicode normalization (NFC) before redaction to prevent homograph bypasses
 
 ### 1.0.0-rc.2: Hardening
-- [ ] Track patched handlers via `weakref.WeakKeyDictionary` instead of `id()` to handle handler removal
-- [ ] Protect `record.exc_text` from leaking unredacted exception text (format a shallow copy or restore after)
-- [ ] Validate mask strings at registration time (reject invalid backreferences)
-- [ ] Make `Config.custom_patterns` truly immutable (`MappingProxyType` or defensive copy)
-- [ ] Document heuristic security model (trusted code only, not user-supplied)
+- [x] Track patched handlers via `weakref.WeakKeyDictionary` instead of `id()` to handle handler removal
+- [x] Protect `record.exc_text` from leaking unredacted exception text (format a shallow copy or restore after)
+- [x] Validate mask strings at registration time (reject invalid backreferences)
+- [x] Make `Config.custom_patterns` truly immutable (`MappingProxyType` or defensive copy)
+- [x] Document heuristic security model (trusted code only, not user-supplied)
 
 ### 1.0.0-rc.3: Documentation & Community
 - [ ] MkDocs or ReadTheDocs site

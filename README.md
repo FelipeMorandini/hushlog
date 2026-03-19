@@ -207,6 +207,18 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 - For structlog/loguru, use the dedicated integrations (`structlog_processor`, `loguru_sink`) instead of `patch()`.
 - Phone detection is US NANP only.
 
+## Security Model
+
+HushLog uses **regex-based pattern matching** for PII detection. This is a best-effort approach with known trade-offs:
+
+- **Heuristic pre-checks** (e.g., checking for `@` before running email regex) are **performance optimizations**, not security boundaries. They reduce regex invocations but do not guarantee detection.
+- **Regex patterns** are pre-compiled and tested against common formats, but they cannot detect PII in obfuscated, encrypted, or encoded forms.
+- **Partial masking** (`mask_style="partial"`) reveals partial information by design. In small organizations, first/last characters may be identifying. Use `mask_style="full"` for maximum privacy.
+- **Custom patterns** are compiled at Config construction and validated, but HushLog does not check for ReDoS vulnerability in user-supplied regex. Use tested patterns from trusted sources.
+- **Unicode normalization** (NFC) is applied before redaction to handle decomposed character forms, but does not protect against confusable characters (homoglyphs like Cyrillic "a" vs Latin "a").
+
+For high-security environments, combine HushLog with additional controls (log access restrictions, encryption at rest, audit logging).
+
 ## Planned
 
 Production hardening, docs site, and more. See the [roadmap](ROADMAP.md) for details.
