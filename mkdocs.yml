@@ -1,0 +1,39 @@
+site_name: HushLog
+site_description: Zero-config PII redaction for Python logging
+site_url: https://FelipeMorandini.github.io/hushlog/
+repo_url: https://github.com/FelipeMorandini/hushlog
+repo_name: FelipeMorandini/hushlog
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+  features:
+    - content.code.copy
+    - navigation.sections
+
+nav:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Configuration: configuration.md
+  - API Reference: api.md
+  - Security Model: security-model.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true

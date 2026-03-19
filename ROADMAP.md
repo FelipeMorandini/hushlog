@@ -112,15 +112,42 @@
 - [x] Document heuristic security model (trusted code only, not user-supplied)
 
 ### 1.0.0-rc.3: Documentation & Community
-- [ ] MkDocs or ReadTheDocs site
-- [ ] API reference (auto-generated from docstrings)
-- [ ] Contribution guide with pattern submission template
-- [ ] Security policy and vulnerability reporting process
+- [x] MkDocs site with material theme
+- [x] API reference (auto-generated via mkdocstrings)
+- [x] Contribution guide with pattern submission template
+- [x] Security policy and vulnerability reporting process (SECURITY.md since v0.1.0)
 
 ### 1.0.0: Release
 - [ ] Final audit pass
 - [ ] Stable PyPI release
 - [ ] Go-to-market: r/Python, r/netsec, Hacker News
+
+---
+
+## v1.1.0 — Polish & Developer Experience
+
+> Deferred improvements from code reviews and Copilot feedback during v0.1–v1.0 development.
+
+### 1.1.0-alpha.1: Pattern Refinements
+- [ ] Phone pattern: enforce matched parentheses around area code (prevent `(555 234-5678`)
+- [ ] AWS secret key: add left boundary assertion before label to prevent mid-word matching
+- [ ] Generic secret: tighten `\S{8,128}` to avoid consuming trailing quotes/punctuation
+- [ ] NFKC normalization option for confusable character detection (Cyrillic "а" vs Latin "a")
+
+### 1.1.0-alpha.2: API & Type Safety
+- [ ] Expose `PatternRegistry` as public API (currently requires private `_registry` import for `RedactingJsonFormatter`)
+- [ ] Add `TYPE_CHECKING` re-exports in `__init__.py` for proper type stub support
+- [ ] Replace `lambda` with named helper in `_redact_partial()` to remove `type: ignore[misc]`
+- [ ] Add `RedactingJsonFormatter.from_config(config)` convenience constructor (avoids manual registry creation)
+
+### 1.1.0-alpha.3: Performance Optimization
+- [ ] Add `unicodedata.is_normalized("NFC", text)` fast-path check before normalize() call
+- [ ] Cache `PatternRegistry` in hypothesis fuzz tests (session-scoped fixture)
+- [ ] Profile and optimize NFC normalization overhead on ASCII-heavy log workloads
+
+### 1.1.0: Release
+- [ ] Updated docs and examples
+- [ ] Tag and release v1.1.0
 
 ---
 
