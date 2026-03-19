@@ -60,9 +60,9 @@
 - [x] Partial masking for API keys: `AKIA****...XXXX`
 
 ### 0.2.0-alpha.4: Custom Patterns API
-- [ ] `Config.custom_patterns` — dict of name → regex string
-- [ ] `Config.disable_patterns` — list of pattern names to skip
-- [ ] Pattern validation on config load (catch invalid regex early)
+- [x] `Config.custom_patterns` — dict of name → regex string
+- [x] `Config.disable_patterns` — list of pattern names to skip
+- [x] Pattern validation on config load (catch invalid regex early)
 
 ### 0.2.0: Release
 - [ ] Full test coverage for all new patterns and masking modes

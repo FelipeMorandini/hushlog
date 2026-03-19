@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 
@@ -24,3 +25,9 @@ class Config:
         if len(self.mask_character) != 1:
             msg = f"mask_character must be a single character, got {self.mask_character!r}"
             raise ValueError(msg)
+        for name, pattern_str in self.custom_patterns.items():
+            try:
+                re.compile(pattern_str)
+            except re.error as exc:
+                msg = f"Invalid regex for custom pattern {name!r}: {exc}"
+                raise ValueError(msg) from exc
