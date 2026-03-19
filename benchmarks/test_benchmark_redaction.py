@@ -79,3 +79,26 @@ def test_bench_full_pipeline(benchmark) -> None:  # type: ignore[no-untyped-def]
         hushlog.unpatch()
         root.removeHandler(handler)
         root.setLevel(original_level)
+
+
+def test_bench_concurrent_throughput(benchmark) -> None:  # type: ignore[no-untyped-def]
+    """Throughput under concurrent load (4 threads)."""
+    import concurrent.futures
+
+    from hushlog._config import Config
+    from hushlog._registry import PatternRegistry
+
+    registry = PatternRegistry.from_config(Config())
+    text = "User john@example.com (SSN: 078-05-1120) called from (555) 234-5678"
+
+    def redact_batch() -> None:
+        for _ in range(100):
+            registry.redact(text)
+
+    def run_concurrent() -> None:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(redact_batch) for _ in range(4)]
+            for f in futures:
+                f.result()
+
+    benchmark(run_concurrent)

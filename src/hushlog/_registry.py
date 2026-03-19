@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import TYPE_CHECKING
 
 from hushlog._types import PatternEntry
@@ -67,6 +68,7 @@ class PatternRegistry:
 
     def _redact_full(self, text: str) -> str:
         """Full redaction: replace matches with mask labels like [EMAIL REDACTED]."""
+        text = unicodedata.normalize("NFC", text)
         for entry in self._patterns.values():
             if entry.heuristic is not None and not entry.heuristic(text):
                 continue
@@ -81,6 +83,7 @@ class PatternRegistry:
 
     def _redact_partial(self, text: str) -> str:
         """Partial redaction: preserve parts of matched values for readability."""
+        text = unicodedata.normalize("NFC", text)
         mc = self._mask_char
         for entry in self._patterns.values():
             if entry.heuristic is not None and not entry.heuristic(text):

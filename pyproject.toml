@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hushlog"
-version = "0.3.0"
+version = "1.0.0rc1"
 description = "Zero-config PII redaction for Python logging"
 readme = "README.md"
 license = "MIT"
@@ -40,6 +40,7 @@ dev = [
     "python-json-logger>=3.0",
     "structlog>=24.0",
     "loguru>=0.7",
+    "hypothesis>=6.0",
 ]
 bench = [
     "pytest-benchmark>=4.0",
