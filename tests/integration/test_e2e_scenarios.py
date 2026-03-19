@@ -12,6 +12,7 @@ import logging
 import threading
 
 import hushlog
+from hushlog import Config
 
 
 def _make_handler() -> tuple[logging.StreamHandler, io.StringIO]:
@@ -295,6 +296,211 @@ class TestCleanMessageByteIdentical:
             root.removeHandler(handler2)
 
             assert patched_output == unpatched_output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestApiKeyRedactionThroughPipeline:
+    """Verify AWS access key redaction through the full logging pipeline."""
+
+    def test_api_key_redaction_through_pipeline(self) -> None:
+        """Log a message containing an AWS access key and verify it is redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("test.aws_key")
+            logger.info("Connecting with key AKIAIOSFODNN7EXAMPLE")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[AWS_ACCESS_KEY REDACTED]" in output
+            assert "AKIAIOSFODNN7EXAMPLE" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestJwtRedactionThroughPipeline:
+    """Verify JWT token redaction through the full logging pipeline."""
+
+    def test_jwt_redaction_through_pipeline(self) -> None:
+        """Log a message containing a JWT token and verify it is redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0."
+                "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+            )
+            logger = logging.getLogger("test.jwt")
+            logger.info("Auth token: %s", jwt_token)
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[JWT REDACTED]" in output
+            assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestMixedSecretsAndPii:
+    """Verify multiple secret types and PII are all redacted in one message."""
+
+    def test_mixed_secrets_and_pii(self) -> None:
+        """Log email + AWS key + Stripe key in one message, verify all three redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("test.mixed_secrets")
+            logger.info(
+                "User admin@corp.com aws=AKIAIOSFODNN7EXAMPLE"
+                " stripe=sk_test_00000000000000000000000000"
+            )
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[EMAIL REDACTED]" in output
+            assert "admin@corp.com" not in output
+            assert "[AWS_ACCESS_KEY REDACTED]" in output
+            assert "AKIAIOSFODNN7EXAMPLE" not in output
+            assert "[STRIPE_KEY REDACTED]" in output
+            assert "sk_test_00000000000000000000000000" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestGenericSecretThroughPipeline:
+    """Verify generic secret pattern redaction through the logging pipeline."""
+
+    def test_generic_secret_through_pipeline(self) -> None:
+        """Log a password=value pattern and verify it is redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("test.generic_secret")
+            logger.info("Config: password=MyS3cr3tValue123")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[SECRET REDACTED]" in output
+            assert "MyS3cr3tValue123" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestDisableApiKeyPatterns:
+    """Verify disable_patterns correctly skips API key and JWT patterns."""
+
+    def test_disable_api_key_patterns(self) -> None:
+        """Disable aws_access_key and jwt patterns; verify they are NOT redacted but email IS."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            config = Config(disable_patterns=frozenset({"aws_access_key", "jwt"}))
+            hushlog.patch(config=config)
+
+            jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+                "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0."
+                "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+            )
+            logger = logging.getLogger("test.disable_api_keys")
+            logger.info(
+                "User admin@corp.com key=AKIAIOSFODNN7EXAMPLE token=%s",
+                jwt_token,
+            )
+            handler.flush()
+            output = buf.getvalue()
+
+            # Email SHOULD be redacted
+            assert "[EMAIL REDACTED]" in output
+            assert "admin@corp.com" not in output
+
+            # AWS key should NOT be redacted (pattern disabled)
+            assert "AKIAIOSFODNN7EXAMPLE" in output
+            assert "[AWS_ACCESS_KEY REDACTED]" not in output
+
+            # JWT should NOT be redacted (pattern disabled)
+            assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" in output
+            assert "[JWT REDACTED]" not in output
         finally:
             hushlog.unpatch()
             for h in root.handlers[:]:

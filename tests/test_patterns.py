@@ -7,10 +7,17 @@ import re
 import pytest
 
 from hushlog._patterns import (
+    _AWS_ACCESS_KEY,
+    _AWS_SECRET_KEY,
     _CREDIT_CARD,
     _EMAIL,
+    _GCP_KEY,
+    _GENERIC_SECRET,
+    _GITHUB_TOKEN,
+    _JWT,
     _PHONE,
     _SSN,
+    _STRIPE_KEY,
     _luhn_check,
     get_builtin_patterns,
 )
@@ -30,7 +37,7 @@ class TestGetBuiltinPatterns:
         assert isinstance(result, tuple)
 
     def test_count(self) -> None:
-        assert len(get_builtin_patterns()) == 4
+        assert len(get_builtin_patterns()) == 11
 
     def test_all_are_pattern_entries(self) -> None:
         for entry in get_builtin_patterns():
@@ -39,7 +46,19 @@ class TestGetBuiltinPatterns:
     def test_order(self) -> None:
         patterns = get_builtin_patterns()
         names = [p.name for p in patterns]
-        assert names == ["credit_card", "ssn", "email", "phone"]
+        assert names == [
+            "credit_card",
+            "ssn",
+            "jwt",
+            "aws_access_key",
+            "aws_secret_key",
+            "stripe_key",
+            "github_token",
+            "gcp_key",
+            "generic_secret",
+            "email",
+            "phone",
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -651,3 +670,366 @@ class TestLuhnEdgeCases:
         """Separators should be stripped before validation."""
         assert _luhn_check("4111-1111-1111-1111") is True
         assert _luhn_check("4111 1111 1111 1111") is True
+
+
+# ---------------------------------------------------------------------------
+# JWT pattern
+# ---------------------------------------------------------------------------
+
+
+class TestJWTPattern:
+    """Test JWT regex and heuristic."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_JWT)
+        return registry.redact(text)
+
+    def test_valid_three_segment_jwt(self) -> None:
+        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123signature"
+        assert self._redact(jwt) == "[JWT REDACTED]"
+
+    def test_jwt_embedded_in_log_message(self) -> None:
+        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123signature"
+        text = f"Auth header: Bearer {jwt} was used"
+        result = self._redact(text)
+        assert "[JWT REDACTED]" in result
+        assert "eyJhbGci" not in result
+
+    def test_two_segments_not_matched(self) -> None:
+        """Only 2 dot-separated segments should NOT match."""
+        text = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        assert "[JWT REDACTED]" not in self._redact(text)
+
+    def test_random_dot_separated_strings_not_matched(self) -> None:
+        """Random dot-separated strings without eyJ prefix should NOT match."""
+        text = "foo.bar.baz"
+        assert self._redact(text) == "foo.bar.baz"
+
+    def test_url_paths_not_matched(self) -> None:
+        """URL-like paths should NOT match as JWT."""
+        text = "https://example.com/api/v1/resource"
+        assert self._redact(text) == text
+
+    def test_heuristic_skips_without_eyj(self) -> None:
+        """Text without 'eyJ' should skip regex entirely."""
+        assert _JWT.heuristic is not None
+        assert _JWT.heuristic("no jwt here at all") is False
+        assert _JWT.heuristic("token: eyJhbGciOiJ...") is True
+
+
+# ---------------------------------------------------------------------------
+# AWS Access Key pattern
+# ---------------------------------------------------------------------------
+
+
+class TestAWSAccessKeyPattern:
+    """Test AWS Access Key regex and heuristic."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_AWS_ACCESS_KEY)
+        return registry.redact(text)
+
+    def test_valid_akia_key(self) -> None:
+        assert self._redact("key: AKIAIOSFODNN7EXAMPLE") == "key: [AWS_ACCESS_KEY REDACTED]"
+
+    def test_valid_asia_key(self) -> None:
+        """ASIA prefix is used for temporary STS credentials."""
+        assert self._redact("key: ASIASAMPLEKEY1234567") == "key: [AWS_ACCESS_KEY REDACTED]"
+
+    def test_lowercase_not_matched(self) -> None:
+        """Lowercase variants should NOT match."""
+        assert "[AWS_ACCESS_KEY REDACTED]" not in self._redact("akiaiosfodnn7example")
+
+    def test_too_short_not_matched(self) -> None:
+        """Key shorter than 20 chars should NOT match."""
+        assert "[AWS_ACCESS_KEY REDACTED]" not in self._redact("AKIAIOSFODNN7EXA")
+
+    def test_wrong_prefix_aida_not_matched(self) -> None:
+        """AIDA prefix (unique ID) should NOT match as access key."""
+        assert "[AWS_ACCESS_KEY REDACTED]" not in self._redact("AIDAIOSFODNN7EXAMPLE1")
+
+    def test_wrong_prefix_aroa_not_matched(self) -> None:
+        """AROA prefix (role ID) should NOT match as access key."""
+        assert "[AWS_ACCESS_KEY REDACTED]" not in self._redact("AROAIOSFODNN7EXAMPLE1")
+
+    def test_heuristic(self) -> None:
+        assert _AWS_ACCESS_KEY.heuristic is not None
+        assert _AWS_ACCESS_KEY.heuristic("no key here") is False
+        assert _AWS_ACCESS_KEY.heuristic("AKIAIOSFODNN7EXAMPLE") is True
+        assert _AWS_ACCESS_KEY.heuristic("ASIASAMPLEKEY12345Q") is True
+
+
+# ---------------------------------------------------------------------------
+# AWS Secret Key pattern
+# ---------------------------------------------------------------------------
+
+
+class TestAWSSecretKeyPattern:
+    """Test AWS Secret Key regex (context-dependent, requires label)."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_AWS_SECRET_KEY)
+        return registry.redact(text)
+
+    def test_with_equals_label(self) -> None:
+        text = "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        result = self._redact(text)
+        assert "[AWS_SECRET_KEY REDACTED]" in result
+        assert "wJalrXUtnFEMI" not in result
+
+    def test_with_colon_label(self) -> None:
+        text = "secret_access_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        result = self._redact(text)
+        assert "[AWS_SECRET_KEY REDACTED]" in result
+
+    def test_bare_40_char_base64_not_matched(self) -> None:
+        """A bare 40-char base64 string WITHOUT label prefix must NOT match."""
+        text = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        assert "[AWS_SECRET_KEY REDACTED]" not in self._redact(text)
+
+    def test_case_insensitive_label(self) -> None:
+        text = "AWS_SECRET_ACCESS_KEY = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        result = self._redact(text)
+        assert "[AWS_SECRET_KEY REDACTED]" in result
+
+    def test_aws_secret_key_label(self) -> None:
+        text = "aws_secret_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        result = self._redact(text)
+        assert "[AWS_SECRET_KEY REDACTED]" in result
+
+    def test_heuristic(self) -> None:
+        assert _AWS_SECRET_KEY.heuristic is not None
+        assert _AWS_SECRET_KEY.heuristic("no keyword here") is False
+        assert _AWS_SECRET_KEY.heuristic("my secret key value") is True
+
+
+# ---------------------------------------------------------------------------
+# Stripe Key pattern
+# ---------------------------------------------------------------------------
+
+
+class TestStripeKeyPattern:
+    """Test Stripe key regex and heuristic."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_STRIPE_KEY)
+        return registry.redact(text)
+
+    def test_sk_test_key(self) -> None:
+        key = "sk_test_00000000000000000000000000"
+        assert self._redact(f"key: {key}") == "key: [STRIPE_KEY REDACTED]"
+
+    def test_pk_test_key(self) -> None:
+        key = "pk_test_00000000000000000000000000"
+        assert self._redact(f"key: {key}") == "key: [STRIPE_KEY REDACTED]"
+
+    def test_rk_test_key(self) -> None:
+        key = "rk_test_00000000000000000000000000"
+        assert self._redact(f"key: {key}") == "key: [STRIPE_KEY REDACTED]"
+
+    def test_random_string_with_live_not_matched(self) -> None:
+        """Random string with _live_ in the middle should NOT match."""
+        text = "my_live_configuration_setting_value"
+        assert "[STRIPE_KEY REDACTED]" not in self._redact(text)
+
+    def test_heuristic(self) -> None:
+        assert _STRIPE_KEY.heuristic is not None
+        assert _STRIPE_KEY.heuristic("no stripe here") is False
+        assert _STRIPE_KEY.heuristic("sk_live_abc") is True
+        assert _STRIPE_KEY.heuristic("pk_test_abc") is True
+
+
+# ---------------------------------------------------------------------------
+# GitHub Token pattern
+# ---------------------------------------------------------------------------
+
+
+class TestGitHubTokenPattern:
+    """Test GitHub token regex and heuristic."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_GITHUB_TOKEN)
+        return registry.redact(text)
+
+    def test_classic_ghp_token(self) -> None:
+        """Classic personal access token: ghp_ + 36 alphanumeric chars."""
+        token = "ghp_" + "A" * 36
+        assert self._redact(f"token: {token}") == "token: [GITHUB_TOKEN REDACTED]"
+
+    def test_fine_grained_github_pat_token(self) -> None:
+        """Fine-grained PAT: github_pat_ + 80+ chars."""
+        token = "github_pat_" + "A" * 82
+        assert self._redact(f"token: {token}") == "token: [GITHUB_TOKEN REDACTED]"
+
+    def test_gho_variant(self) -> None:
+        """OAuth access token prefix."""
+        token = "gho_" + "B" * 36
+        assert self._redact(f"token: {token}") == "token: [GITHUB_TOKEN REDACTED]"
+
+    def test_ghs_variant(self) -> None:
+        """Server-to-server token prefix."""
+        token = "ghs_" + "C" * 36
+        assert self._redact(f"token: {token}") == "token: [GITHUB_TOKEN REDACTED]"
+
+    def test_too_short_not_matched(self) -> None:
+        """ghp_ with fewer than 36 chars should NOT match."""
+        token = "ghp_" + "A" * 10
+        assert "[GITHUB_TOKEN REDACTED]" not in self._redact(token)
+
+    def test_wrong_prefix_not_matched(self) -> None:
+        """A prefix like ghx_ should NOT match."""
+        token = "ghx_" + "A" * 36
+        assert "[GITHUB_TOKEN REDACTED]" not in self._redact(token)
+
+    def test_heuristic(self) -> None:
+        assert _GITHUB_TOKEN.heuristic is not None
+        assert _GITHUB_TOKEN.heuristic("no token here") is False
+        assert _GITHUB_TOKEN.heuristic("ghp_something") is True
+        assert _GITHUB_TOKEN.heuristic("github_pat_something") is True
+
+
+# ---------------------------------------------------------------------------
+# GCP Key pattern
+# ---------------------------------------------------------------------------
+
+
+class TestGCPKeyPattern:
+    """Test GCP API key regex and heuristic."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_GCP_KEY)
+        return registry.redact(text)
+
+    def test_valid_aiza_key(self) -> None:
+        """Valid GCP key: AIza + 35 chars = 39 total."""
+        key = "AIza" + "A" * 35
+        assert self._redact(f"key: {key}") == "key: [GCP_KEY REDACTED]"
+
+    def test_too_short_not_matched(self) -> None:
+        """AIza + fewer than 35 chars should NOT match."""
+        key = "AIza" + "A" * 10
+        assert "[GCP_KEY REDACTED]" not in self._redact(key)
+
+    def test_lowercase_aiza_not_matched(self) -> None:
+        """Lowercase 'aiza' should NOT match."""
+        key = "aiza" + "A" * 35
+        assert "[GCP_KEY REDACTED]" not in self._redact(key)
+
+    def test_heuristic(self) -> None:
+        assert _GCP_KEY.heuristic is not None
+        assert _GCP_KEY.heuristic("no gcp key here") is False
+        assert _GCP_KEY.heuristic("AIzaSyExampleKey") is True
+
+
+# ---------------------------------------------------------------------------
+# Generic Secret pattern
+# ---------------------------------------------------------------------------
+
+
+class TestGenericSecretPattern:
+    """Test generic secret regex (context-dependent, requires label)."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_GENERIC_SECRET)
+        return registry.redact(text)
+
+    def test_password_equals(self) -> None:
+        text = "password=MyS3cr3tP@ss"
+        result = self._redact(text)
+        assert "[SECRET REDACTED]" in result
+        assert "MyS3cr3tP@ss" not in result
+
+    def test_api_key_colon(self) -> None:
+        text = "api_key: sk-abc123def456ghi"
+        result = self._redact(text)
+        assert "[SECRET REDACTED]" in result
+        assert "sk-abc123def456ghi" not in result
+
+    def test_secret_with_quotes(self) -> None:
+        text = 'secret = "some-secret-value-here"'
+        result = self._redact(text)
+        assert "[SECRET REDACTED]" in result
+        assert "some-secret-value-here" not in result
+
+    def test_bare_value_without_label_not_matched(self) -> None:
+        """A bare value without a label prefix must NOT match."""
+        text = "MyS3cr3tP@ssw0rd123"
+        assert "[SECRET REDACTED]" not in self._redact(text)
+
+    def test_short_value_not_matched(self) -> None:
+        """Values shorter than 8 chars should NOT match."""
+        text = "password=short"
+        assert "[SECRET REDACTED]" not in self._redact(text)
+
+    def test_docs_text_password_equals_short(self) -> None:
+        r"""Doc-like text 'password= is required' has no 8+ char \S value after =."""
+        text = "The password= field is required"
+        # "field" is only 5 chars, so should not match
+        # But "password=" followed by " field" — \S{8,} requires 8+ non-space
+        # " field" starts with space, so \S{8,} won't match
+        assert "[SECRET REDACTED]" not in self._redact(text)
+
+    def test_heuristic(self) -> None:
+        from hushlog._patterns import _generic_secret_heuristic
+
+        assert _generic_secret_heuristic("no keywords here") is False
+        assert _generic_secret_heuristic("password=abc") is True
+        assert _generic_secret_heuristic("my api_key value") is True
+        assert _generic_secret_heuristic("auth token here") is True
+
+    def test_client_secret_label(self) -> None:
+        text = "client_secret=abcdefgh12345678"
+        result = self._redact(text)
+        assert "[SECRET REDACTED]" in result
+
+    def test_access_token_label(self) -> None:
+        text = "access_token: mytoken12345678value"
+        result = self._redact(text)
+        assert "[SECRET REDACTED]" in result
+
+
+# ---------------------------------------------------------------------------
+# Mixed API keys and PII
+# ---------------------------------------------------------------------------
+
+
+class TestMixedAPIKeysAndPII:
+    """Test multiple API key/PII types redacted in a single string."""
+
+    def _redact_all(self, text: str) -> str:
+        registry = PatternRegistry()
+        for entry in get_builtin_patterns():
+            registry.register(entry)
+        return registry.redact(text)
+
+    def test_aws_key_and_email(self) -> None:
+        text = "key=AKIAIOSFODNN7EXAMPLE user=admin@example.com"
+        result = self._redact_all(text)
+        assert "[AWS_ACCESS_KEY REDACTED]" in result
+        assert "[EMAIL REDACTED]" in result
+        assert "AKIAIOSFODNN7EXAMPLE" not in result
+        assert "admin@example.com" not in result
+
+    def test_jwt_and_phone(self) -> None:
+        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.abc123signature"
+        text = f"token={jwt} caller=555-234-5678"
+        result = self._redact_all(text)
+        assert "[JWT REDACTED]" in result
+        assert "[PHONE REDACTED]" in result
+        assert "eyJhbGci" not in result
+        assert "555-234-5678" not in result
+
+    def test_stripe_key_and_ssn(self) -> None:
+        text = "payment_key=sk_test_00000000000000000000000000 ssn=123-45-6789"
+        result = self._redact_all(text)
+        assert "[STRIPE_KEY REDACTED]" in result
+        assert "[SSN REDACTED]" in result
+        assert "sk_test_" not in result
+        assert "123-45-6789" not in result

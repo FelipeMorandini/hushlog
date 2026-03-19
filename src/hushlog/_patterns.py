@@ -98,9 +98,159 @@ _PHONE = PatternEntry(
 )
 
 
+# --- JWT ---
+# Matches JSON Web Tokens (3 or 5 dot-separated base64url segments).
+# Both header and payload start with eyJ (base64 of '{"').
+_JWT_RE = re.compile(
+    r"eyJ[A-Za-z0-9_-]+\."
+    r"eyJ[A-Za-z0-9_-]+\."
+    r"[A-Za-z0-9_-]+"
+    r"(?:\.[A-Za-z0-9_-]+){0,2}"  # JWE has 5 segments
+)
+
+_JWT = PatternEntry(
+    name="jwt",
+    regex=_JWT_RE,
+    heuristic=lambda text: "eyJ" in text,
+    mask="[JWT REDACTED]",
+)
+
+
+# --- AWS Access Key ---
+# Matches AKIA (long-lived) and ASIA (temporary/STS) access key IDs.
+_AWS_ACCESS_KEY_RE = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")
+
+_AWS_ACCESS_KEY = PatternEntry(
+    name="aws_access_key",
+    regex=_AWS_ACCESS_KEY_RE,
+    heuristic=lambda text: "AKIA" in text or "ASIA" in text,
+    mask="[AWS_ACCESS_KEY REDACTED]",
+)
+
+
+# --- AWS Secret Key ---
+# Context-dependent: requires a label prefix to avoid false positives on random base64.
+_AWS_SECRET_KEY_RE = re.compile(
+    r"(?i)"
+    r"(?:aws_secret_access_key|aws_secret_key|secret_access_key)"
+    r"\s*[=:\s]\s*"
+    r"[A-Za-z0-9/+=]{40}"
+    r"(?![A-Za-z0-9/+=])"
+)
+
+_AWS_SECRET_KEY = PatternEntry(
+    name="aws_secret_key",
+    regex=_AWS_SECRET_KEY_RE,
+    heuristic=lambda text: "secret" in text.lower(),
+    mask="[AWS_SECRET_KEY REDACTED]",
+)
+
+
+# --- Stripe Key ---
+# Matches sk_live_, pk_live_, rk_live_, sk_test_, pk_test_, rk_test_ prefixed keys.
+_STRIPE_KEY_RE = re.compile(r"\b[spr]k_(?:live|test)_[A-Za-z0-9]{24,}\b")
+
+_STRIPE_KEY = PatternEntry(
+    name="stripe_key",
+    regex=_STRIPE_KEY_RE,
+    heuristic=lambda text: "_live_" in text or "_test_" in text,
+    mask="[STRIPE_KEY REDACTED]",
+)
+
+
+# --- GitHub Token ---
+# Matches classic tokens (ghp_, gho_, ghs_, ghu_, ghr_) and fine-grained (github_pat_).
+_GITHUB_TOKEN_RE = re.compile(
+    r"\bgh[pousr]_[A-Za-z0-9]{36}\b"
+    r"|"
+    r"\bgithub_pat_[A-Za-z0-9_]{80,}\b"
+)
+
+_GITHUB_TOKEN = PatternEntry(
+    name="github_token",
+    regex=_GITHUB_TOKEN_RE,
+    heuristic=lambda text: (
+        "ghp_" in text
+        or "gho_" in text
+        or "ghs_" in text
+        or "ghu_" in text
+        or "ghr_" in text
+        or "github_pat_" in text
+    ),
+    mask="[GITHUB_TOKEN REDACTED]",
+)
+
+
+# --- GCP API Key ---
+# Matches Google Cloud API keys starting with AIza.
+_GCP_KEY_RE = re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b")
+
+_GCP_KEY = PatternEntry(
+    name="gcp_key",
+    regex=_GCP_KEY_RE,
+    heuristic=lambda text: "AIza" in text,
+    mask="[GCP_KEY REDACTED]",
+)
+
+
+# --- Generic Secret ---
+# Context-dependent: matches values after common secret-related labels.
+# Replaces the entire match (label + value) to avoid leaking context.
+_GENERIC_SECRET_RE = re.compile(
+    r"(?i)"
+    r"(?:password|passwd|pwd|secret|api_key|apikey|api[-_]secret|"
+    r"auth_token|access_token|client_secret|private_key)"
+    r"\s*[=:]\s*"
+    r"[\"']?"
+    r"\S{8,128}"
+    r"[\"']?"
+)
+
+_GENERIC_SECRET_HEURISTIC_KEYS = (
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "api_key",
+    "apikey",
+    "token",
+    "private_key",
+)
+
+
+def _generic_secret_heuristic(text: str) -> bool:
+    lowered = text.lower()
+    return any(k in lowered for k in _GENERIC_SECRET_HEURISTIC_KEYS)
+
+
+_GENERIC_SECRET = PatternEntry(
+    name="generic_secret",
+    regex=_GENERIC_SECRET_RE,
+    heuristic=_generic_secret_heuristic,
+    mask="[SECRET REDACTED]",
+)
+
+
 def get_builtin_patterns() -> tuple[PatternEntry, ...]:
     """Return all built-in PII patterns in recommended application order.
 
-    Order: credit_card, ssn, email, phone (most specific first, greediest last).
+    Order rationale:
+    - Specific patterns with fixed prefixes (credit_card, ssn, API keys) first
+    - Context-dependent patterns (generic_secret) before general patterns (email)
+      because email redaction inserts spaces that break generic_secret's ``\\S{8,128}``
+    - Broadest patterns (email, phone) last to avoid consuming text needed by
+      more specific patterns
     """
-    return (_CREDIT_CARD, _SSN, _EMAIL, _PHONE)
+    return (
+        _CREDIT_CARD,
+        _SSN,
+        _JWT,
+        _AWS_ACCESS_KEY,
+        _AWS_SECRET_KEY,
+        _STRIPE_KEY,
+        _GITHUB_TOKEN,
+        _GCP_KEY,
+        _GENERIC_SECRET,
+        _EMAIL,
+        _PHONE,
+    )

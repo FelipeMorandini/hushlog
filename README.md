@@ -61,6 +61,13 @@ HushLog wraps your existing logging formatters with a `RedactingFormatter` that 
 | Credit Card | `4111-1111-1111-1111` | `[CREDIT_CARD REDACTED]` | Luhn validated, supports spaces/dashes |
 | SSN | `123-45-6789` | `[SSN REDACTED]` | Dashed format only, invalid ranges excluded |
 | Phone | `(555) 123-4567` | `[PHONE REDACTED]` | US NANP, multiple formats |
+| JWT | `eyJhbGci...` | `[JWT REDACTED]` | 3-5 segment base64url tokens |
+| AWS Access Key | `AKIAIOSFODNN7EXAMPLE` | `[AWS_ACCESS_KEY REDACTED]` | AKIA/ASIA prefixed |
+| AWS Secret Key | `aws_secret_access_key=...` | `[AWS_SECRET_KEY REDACTED]` | Context-dependent (requires label) |
+| Stripe Key | `sk_live_abc123...` | `[STRIPE_KEY REDACTED]` | sk/pk/rk live/test keys |
+| GitHub Token | `ghp_xxxx...` | `[GITHUB_TOKEN REDACTED]` | Classic + fine-grained (`github_pat_`) |
+| GCP API Key | `AIzaSyA...` | `[GCP_KEY REDACTED]` | AIza-prefixed keys |
+| Generic Secret | `password=MyS3cret` | `[SECRET REDACTED]` | Label-based (password, secret, api_key, etc.) |
 
 ## Configuration
 
@@ -96,7 +103,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 ## Planned
 
-IPv4/IPv6 addresses, AWS keys, Stripe keys, GitHub tokens, JWT tokens, partial masking, and more. See the [roadmap](ROADMAP.md) for details.
+IPv4/IPv6 addresses, partial masking, structlog/loguru integrations, and more. See the [roadmap](ROADMAP.md) for details.
 
 ## Contributing
 
