@@ -8,12 +8,17 @@ import weakref
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hushlog._config import Config
+    from hushlog._config import Config as Config
+    from hushlog._json_formatter import RedactingJsonFormatter as RedactingJsonFormatter
+    from hushlog._loguru import loguru_sink as loguru_sink
+    from hushlog._registry import PatternRegistry as PatternRegistry
+    from hushlog._structlog import structlog_processor as structlog_processor
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "Config",
+    "PatternRegistry",
     "RedactingJsonFormatter",
     "loguru_sink",
     "patch",
@@ -106,6 +111,10 @@ def __getattr__(name: str) -> object:
         from hushlog._config import Config
 
         return Config
+    if name == "PatternRegistry":
+        from hushlog._registry import PatternRegistry
+
+        return PatternRegistry
     if name == "RedactingJsonFormatter":
         from hushlog._json_formatter import RedactingJsonFormatter
 

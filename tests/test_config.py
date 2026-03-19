@@ -124,6 +124,30 @@ class TestConfigPatternValidation:
         assert config.custom_patterns == {"empty": ""}
 
 
+class TestConfigNormalizeForm:
+    """Test normalize_form validation."""
+
+    def test_default_is_nfc(self) -> None:
+        config = Config()
+        assert config.normalize_form == "NFC"
+
+    def test_nfkc_accepted(self) -> None:
+        config = Config(normalize_form="NFKC")
+        assert config.normalize_form == "NFKC"
+
+    def test_none_accepted(self) -> None:
+        config = Config(normalize_form="none")
+        assert config.normalize_form == "none"
+
+    def test_invalid_raises(self) -> None:
+        with pytest.raises(ValueError, match="normalize_form"):
+            Config(normalize_form="NFD")
+
+    def test_invalid_empty_raises(self) -> None:
+        with pytest.raises(ValueError, match="normalize_form"):
+            Config(normalize_form="")
+
+
 class TestConfigEquality:
     """Test dataclass-generated equality."""
 

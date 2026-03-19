@@ -129,25 +129,25 @@
 > Deferred improvements from code reviews and Copilot feedback during v0.1–v1.0 development.
 
 ### 1.1.0-alpha.1: Pattern Refinements
-- [ ] Phone pattern: enforce matched parentheses around area code (prevent `(555 234-5678`)
-- [ ] AWS secret key: add left boundary assertion before label to prevent mid-word matching
-- [ ] Generic secret: tighten `\S{8,128}` to avoid consuming trailing quotes/punctuation
-- [ ] NFKC normalization option for confusable character detection (Cyrillic "а" vs Latin "a")
+- [x] Phone pattern: enforce matched parentheses around area code (prevent `(555 234-5678`)
+- [x] AWS secret key: add left boundary assertion before label to prevent mid-word matching
+- [x] Generic secret: tighten `\S{8,128}` to avoid consuming trailing quotes/punctuation
+- [x] NFKC normalization option for confusable character detection (Cyrillic "а" vs Latin "a")
 
 ### 1.1.0-alpha.2: API & Type Safety
-- [ ] Expose `PatternRegistry` as public API (currently requires private `_registry` import for `RedactingJsonFormatter`)
-- [ ] Add `TYPE_CHECKING` re-exports in `__init__.py` for proper type stub support
-- [ ] Replace `lambda` with named helper in `_redact_partial()` to remove `type: ignore[misc]`
-- [ ] Add `RedactingJsonFormatter.from_config(config)` convenience constructor (avoids manual registry creation)
+- [x] Expose `PatternRegistry` as public API (currently requires private `_registry` import for `RedactingJsonFormatter`)
+- [x] Add `TYPE_CHECKING` re-exports in `__init__.py` for proper type stub support
+- [x] Replace `lambda` with named helper in `_redact_partial()` to remove `type: ignore[misc]`
+- [x] Add `RedactingJsonFormatter.from_config(config)` convenience constructor (avoids manual registry creation)
 
 ### 1.1.0-alpha.3: Performance Optimization
-- [ ] Add `unicodedata.is_normalized("NFC", text)` fast-path check before normalize() call
-- [ ] Cache `PatternRegistry` in hypothesis fuzz tests (session-scoped fixture)
-- [ ] Profile and optimize NFC normalization overhead on ASCII-heavy log workloads
+- [x] Add `unicodedata.is_normalized("NFC", text)` fast-path check before normalize() call
+- [x] Cache `PatternRegistry` in hypothesis fuzz tests (session-scoped fixture)
+- [x] Profile and optimize NFC normalization overhead on ASCII-heavy log workloads
 
 ### 1.1.0: Release
-- [ ] Updated docs and examples
-- [ ] Tag and release v1.1.0
+- [x] Updated docs and examples
+- [x] Tag and release v1.1.0
 
 ---
 

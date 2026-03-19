@@ -212,7 +212,7 @@ _EMAIL = PatternEntry(
 _PHONE_RE = re.compile(
     r"(?<![0-9])"  # Not preceded by a digit
     r"(?:\+?1[\s.-]?)?"  # Optional country code +1 or 1
-    r"\(?[2-9][0-9]{2}\)?[\s.-]?"  # Area code (2-9 start) with optional parens
+    r"(?:\([2-9][0-9]{2}\)|(?<!\()[2-9][0-9]{2})[\s.-]?"  # Area code: both parens or neither
     r"[2-9][0-9]{2}[\s.-]?"  # Exchange (2-9 start)
     r"[0-9]{4}"  # Subscriber
     r"(?![0-9])"  # Not followed by a digit
@@ -263,7 +263,7 @@ _AWS_ACCESS_KEY = PatternEntry(
 # Context-dependent: requires a label prefix to avoid false positives on random base64.
 _AWS_SECRET_KEY_RE = re.compile(
     r"(?i)"
-    r"(?:aws_secret_access_key|aws_secret_key|secret_access_key)"
+    r"(?<![a-zA-Z_])(?:aws_secret_access_key|aws_secret_key|secret_access_key)"
     r"\s*[=:\s]\s*"
     r"[A-Za-z0-9/+=]{40}"
     r"(?![A-Za-z0-9/+=])"
@@ -402,7 +402,7 @@ _GENERIC_SECRET_RE = re.compile(
     r"auth_token|access_token|client_secret|private_key)"
     r"\s*[=:]\s*"
     r"[\"']?"
-    r"\S{8,128}"
+    r"[^\s\"']{8,128}"
     r"[\"']?"
 )
 

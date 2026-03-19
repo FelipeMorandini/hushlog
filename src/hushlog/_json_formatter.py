@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from hushlog._config import Config
     from hushlog._registry import PatternRegistry
 
 try:
@@ -62,6 +63,23 @@ class RedactingJsonFormatter(logging.Formatter):
             )
         else:
             self._json_formatter = None
+
+    @classmethod
+    def from_config(
+        cls,
+        config: Config | None = None,
+        *,
+        fmt: str | None = None,
+        datefmt: str | None = None,
+        json_indent: int | None = None,
+    ) -> RedactingJsonFormatter:
+        """Create a RedactingJsonFormatter from a Config."""
+        from hushlog._config import Config as _Config
+        from hushlog._registry import PatternRegistry
+
+        resolved_config = config if config is not None else _Config()
+        registry = PatternRegistry.from_config(resolved_config)
+        return cls(registry, fmt=fmt, datefmt=datefmt, json_indent=json_indent)
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as redacted JSON."""
