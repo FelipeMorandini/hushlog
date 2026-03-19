@@ -115,11 +115,9 @@ Use `RedactingJsonFormatter` as a drop-in JSON formatter for any handler:
 
 ```python
 import logging
-from hushlog import Config, RedactingJsonFormatter
-from hushlog._registry import PatternRegistry  # internal API
+from hushlog import RedactingJsonFormatter
 
-registry = PatternRegistry.from_config(Config())
-formatter = RedactingJsonFormatter(registry)
+formatter = RedactingJsonFormatter.from_config()
 
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)

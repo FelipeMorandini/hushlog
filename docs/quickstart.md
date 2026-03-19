@@ -73,11 +73,8 @@ Both `patch()` and `unpatch()` are idempotent — safe to call multiple times.
 
 ```python
 from hushlog import RedactingJsonFormatter
-from hushlog._registry import PatternRegistry
-from hushlog._config import Config
 
-registry = PatternRegistry.from_config(Config())
-formatter = RedactingJsonFormatter(registry)
+formatter = RedactingJsonFormatter.from_config()
 handler.setFormatter(formatter)
 ```
 

@@ -1337,7 +1337,7 @@ class TestGenericSecretQuoteBoundary:
         result = self._redact('password="mysecretvalue123"')
         assert "[SECRET REDACTED]" in result
         # The trailing quote should NOT be consumed by \S
-        assert result.endswith('"') or "[SECRET REDACTED]" in result
+        assert result.endswith('"'), f"Trailing quote should be preserved: {result!r}"
 
     def test_single_quoted_value(self) -> None:
         result = self._redact("password='mysecretvalue123'")
