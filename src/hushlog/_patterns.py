@@ -50,6 +50,105 @@ def _ipv6_validate(text: str) -> bool:
         return False
 
 
+# ---------------------------------------------------------------------------
+# Partial masker functions
+# ---------------------------------------------------------------------------
+
+
+def _partial_mask_email(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    local, domain = text.rsplit("@", 1)
+    if "." in domain:
+        domain_name, tld = domain.rsplit(".", 1)
+        return f"{local[0]}{mc * 3}@{domain_name[0]}{mc * 3}.{tld}"
+    return f"{local[0]}{mc * 3}@{mc * 3}"
+
+
+def _partial_mask_credit_card(m: re.Match[str], mc: str) -> str:
+    digits = [c for c in m.group() if c in _ASCII_DIGITS]
+    last4 = "".join(digits[-4:])
+    return f"{mc * 4}-{mc * 4}-{mc * 4}-{last4}"
+
+
+def _partial_mask_ssn(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    last4 = text[-4:]
+    return f"{mc * 3}-{mc * 2}-{last4}"
+
+
+def _partial_mask_phone(m: re.Match[str], mc: str) -> str:
+    digits = [c for c in m.group() if c in _ASCII_DIGITS]
+    last4 = "".join(digits[-4:])
+    return f"({mc * 3}) {mc * 3}-{last4}"
+
+
+def _partial_mask_jwt(m: re.Match[str], mc: str) -> str:
+    return f"eyJ{mc * 3}...{mc * 3}"
+
+
+def _partial_mask_aws_access_key(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    return f"{text[:4]}{mc * (len(text) - 8)}{text[-4:]}"
+
+
+def _partial_mask_aws_secret_key(m: re.Match[str], mc: str) -> str:
+    # Match includes label=value. Keep label, mask value.
+    text = m.group()
+    for sep in ("=", ":"):
+        if sep in text:
+            idx = text.index(sep)
+            label = text[: idx + 1]
+            return f"{label} {mc * 40}"
+    return f"{mc * len(text)}"
+
+
+def _partial_mask_stripe_key(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    if len(text) > 8:
+        return f"{text[:4]}{mc * (len(text) - 8)}{text[-4:]}"
+    return mc * len(text)
+
+
+def _partial_mask_github_token(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    if len(text) > 8:
+        return f"{text[:4]}{mc * (len(text) - 8)}{text[-4:]}"
+    return mc * len(text)
+
+
+def _partial_mask_gcp_key(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    if len(text) > 8:
+        return f"{text[:4]}{mc * (len(text) - 8)}{text[-4:]}"
+    return mc * len(text)
+
+
+def _partial_mask_ipv4(m: re.Match[str], mc: str) -> str:
+    parts = m.group().split(".")
+    return f"{parts[0]}.{mc * 3}.{mc * 3}.{mc * 3}"
+
+
+def _partial_mask_ipv6(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    first_group = text.split(":")[0] if ":" in text else text
+    return f"{first_group}:{mc * 4}:{mc * 4}:{mc * 4}"
+
+
+def _partial_mask_generic_secret(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    for sep in ("=", ":"):
+        if sep in text:
+            idx = text.index(sep)
+            label = text[: idx + 1]
+            return f"{label} {mc * 8}"
+    return mc * len(text)
+
+
+# ---------------------------------------------------------------------------
+# Pattern definitions
+# ---------------------------------------------------------------------------
+
+
 # --- Credit Card ---
 # Matches 13-19 digit sequences with optional separators (space, dash)
 # Prefix-aware: Visa (4), MasterCard (5[1-5], 2[2-7]), Amex (3[47]), Discover (6011, 65, 644-649)
@@ -74,6 +173,7 @@ _CREDIT_CARD = PatternEntry(
     heuristic=None,
     mask="[CREDIT_CARD REDACTED]",
     validator=_luhn_check,
+    partial_masker=_partial_mask_credit_card,
 )
 
 
@@ -87,6 +187,7 @@ _SSN = PatternEntry(
     regex=_SSN_RE,
     heuristic=lambda text: "-" in text,
     mask="[SSN REDACTED]",
+    partial_masker=_partial_mask_ssn,
 )
 
 
@@ -99,6 +200,7 @@ _EMAIL = PatternEntry(
     regex=_EMAIL_RE,
     heuristic=lambda text: "@" in text,
     mask="[EMAIL REDACTED]",
+    partial_masker=_partial_mask_email,
 )
 
 
@@ -121,6 +223,7 @@ _PHONE = PatternEntry(
     regex=_PHONE_RE,
     heuristic=None,
     mask="[PHONE REDACTED]",
+    partial_masker=_partial_mask_phone,
 )
 
 
@@ -139,6 +242,7 @@ _JWT = PatternEntry(
     regex=_JWT_RE,
     heuristic=lambda text: "eyJ" in text,
     mask="[JWT REDACTED]",
+    partial_masker=_partial_mask_jwt,
 )
 
 
@@ -151,6 +255,7 @@ _AWS_ACCESS_KEY = PatternEntry(
     regex=_AWS_ACCESS_KEY_RE,
     heuristic=lambda text: "AKIA" in text or "ASIA" in text,
     mask="[AWS_ACCESS_KEY REDACTED]",
+    partial_masker=_partial_mask_aws_access_key,
 )
 
 
@@ -169,6 +274,7 @@ _AWS_SECRET_KEY = PatternEntry(
     regex=_AWS_SECRET_KEY_RE,
     heuristic=lambda text: "secret" in text.lower(),
     mask="[AWS_SECRET_KEY REDACTED]",
+    partial_masker=_partial_mask_aws_secret_key,
 )
 
 
@@ -181,6 +287,7 @@ _STRIPE_KEY = PatternEntry(
     regex=_STRIPE_KEY_RE,
     heuristic=lambda text: "_live_" in text or "_test_" in text,
     mask="[STRIPE_KEY REDACTED]",
+    partial_masker=_partial_mask_stripe_key,
 )
 
 
@@ -204,6 +311,7 @@ _GITHUB_TOKEN = PatternEntry(
         or "github_pat_" in text
     ),
     mask="[GITHUB_TOKEN REDACTED]",
+    partial_masker=_partial_mask_github_token,
 )
 
 
@@ -216,6 +324,7 @@ _GCP_KEY = PatternEntry(
     regex=_GCP_KEY_RE,
     heuristic=lambda text: "AIza" in text,
     mask="[GCP_KEY REDACTED]",
+    partial_masker=_partial_mask_gcp_key,
 )
 
 
@@ -234,6 +343,7 @@ _IPV4 = PatternEntry(
     heuristic=None,
     mask="[IPV4 REDACTED]",
     validator=_ipv4_validate,
+    partial_masker=_partial_mask_ipv4,
 )
 
 
@@ -279,6 +389,7 @@ _IPV6 = PatternEntry(
     heuristic=lambda text: ":" in text,
     mask="[IPV6 REDACTED]",
     validator=_ipv6_validate,
+    partial_masker=_partial_mask_ipv6,
 )
 
 
@@ -317,6 +428,7 @@ _GENERIC_SECRET = PatternEntry(
     regex=_GENERIC_SECRET_RE,
     heuristic=_generic_secret_heuristic,
     mask="[SECRET REDACTED]",
+    partial_masker=_partial_mask_generic_secret,
 )
 
 

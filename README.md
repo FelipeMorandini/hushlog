@@ -84,7 +84,26 @@ hushlog.patch(Config(
 ))
 ```
 
-> **Note:** The `mask_style` option for partial masking (e.g., `j***@example.com`) is planned for v0.2.0.
+### Partial Masking
+
+Show partial values instead of full redaction:
+
+```python
+hushlog.patch(Config(mask_style="partial"))
+# john@example.com → j***@e***.com
+# 4111111111111111 → ****-****-****-1111
+# 078-05-1120      → ***-**-1120
+# (555) 234-5678   → (***) ***-5678
+```
+
+Use a custom mask character:
+
+```python
+hushlog.patch(Config(mask_style="partial", mask_character="#"))
+# john@example.com → j###@e###.com
+```
+
+> **Note:** Partial masking reveals partial information (first/last characters). In small organizations, this may be identifying. Use `mask_style="full"` (default) for maximum privacy.
 
 ## Teardown
 
@@ -105,7 +124,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 ## Planned
 
-Partial masking, structlog/loguru integrations, and more. See the [roadmap](ROADMAP.md) for details.
+Structlog/loguru integrations, pattern validation, and more. See the [roadmap](ROADMAP.md) for details.
 
 ## Contributing
 

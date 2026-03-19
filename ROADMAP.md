@@ -53,11 +53,11 @@
 - [x] IPv6 addresses (full, compressed, and mixed formats)
 
 ### 0.2.0-alpha.3: Partial Masking
-- [ ] `Config` dataclass with `mask_character` option
-- [ ] Partial masking for emails: `j***@g***.com`
-- [ ] Partial masking for credit cards: `****-****-****-1234`
-- [ ] Partial masking for phone numbers: `(***) ***-1234`
-- [ ] Partial masking for API keys: `AKIA****...XXXX`
+- [x] `Config` dataclass with `mask_character` option
+- [x] Partial masking for emails: `j***@g***.com`
+- [x] Partial masking for credit cards: `****-****-****-1234`
+- [x] Partial masking for phone numbers: `(***) ***-1234`
+- [x] Partial masking for API keys: `AKIA****...XXXX`
 
 ### 0.2.0-alpha.4: Custom Patterns API
 - [ ] `Config.custom_patterns` — dict of name → regex string

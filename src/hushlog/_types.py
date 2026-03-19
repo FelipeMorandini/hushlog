@@ -17,3 +17,4 @@ class PatternEntry(NamedTuple):
     heuristic: Callable[[str], bool] | None
     mask: str
     validator: Callable[[str], bool] | None = None
+    partial_masker: Callable[[re.Match[str], str], str] | None = None

@@ -15,3 +15,12 @@ class Config:
     custom_patterns: dict[str, str] = field(default_factory=dict)
     disable_patterns: frozenset[str] = field(default_factory=frozenset)
     mask_style: str = "full"
+    mask_character: str = "*"
+
+    def __post_init__(self) -> None:
+        if self.mask_style not in ("full", "partial"):
+            msg = f"mask_style must be 'full' or 'partial', got {self.mask_style!r}"
+            raise ValueError(msg)
+        if len(self.mask_character) != 1:
+            msg = f"mask_character must be a single character, got {self.mask_character!r}"
+            raise ValueError(msg)
