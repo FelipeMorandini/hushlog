@@ -95,6 +95,35 @@ class TestConfigImmutability:
             config.unknown = "value"  # type: ignore[attr-defined]
 
 
+class TestConfigPatternValidation:
+    """Test that custom_patterns regex strings are validated at construction."""
+
+    def test_valid_regex_accepted(self) -> None:
+        """Config accepts valid regex patterns."""
+        config = Config(custom_patterns={"test": r"\d+", "email": r"\S+@\S+"})
+        assert len(config.custom_patterns) == 2
+
+    def test_invalid_regex_raises_valueerror(self) -> None:
+        """Config rejects invalid regex with a clear ValueError."""
+        with pytest.raises(ValueError, match="Invalid regex for custom pattern 'bad'"):
+            Config(custom_patterns={"bad": r"[invalid"})
+
+    def test_invalid_regex_includes_pattern_name(self) -> None:
+        """The error message includes which pattern failed."""
+        with pytest.raises(ValueError, match="'broken_pattern'"):
+            Config(custom_patterns={"broken_pattern": r"(unclosed"})
+
+    def test_multiple_patterns_first_invalid_raises(self) -> None:
+        """If any pattern is invalid, construction fails."""
+        with pytest.raises(ValueError, match="Invalid regex"):
+            Config(custom_patterns={"good": r"\d+", "bad": r"[oops"})
+
+    def test_empty_regex_accepted(self) -> None:
+        """An empty regex string is technically valid."""
+        config = Config(custom_patterns={"empty": ""})
+        assert config.custom_patterns == {"empty": ""}
+
+
 class TestConfigEquality:
     """Test dataclass-generated equality."""
 
