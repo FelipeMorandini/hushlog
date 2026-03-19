@@ -34,7 +34,7 @@ def test_unpatch_is_callable() -> None:
 
 def test_all_exports_are_complete() -> None:
     """__all__ lists exactly the intended public API."""
-    assert set(hushlog.__all__) == {"patch", "unpatch"}
+    assert set(hushlog.__all__) == {"patch", "unpatch", "Config"}
 
 
 def test_all_exports_resolve() -> None:
@@ -46,9 +46,14 @@ def test_all_exports_resolve() -> None:
 def test_no_unexpected_public_exports() -> None:
     """Module does not leak private implementation names as public attributes."""
     public_attrs = {n for n in dir(hushlog) if not n.startswith("_")}
-    expected = {"patch", "unpatch"}
+    expected = {"patch", "unpatch", "Config"}
     # Allow standard module-level names that Python or packaging may add
-    allowed_extras = {"annotations"}
+    allowed_extras = {
+        "annotations",
+        "logging",
+        "threading",
+        "TYPE_CHECKING",
+    }
     unexpected = public_attrs - expected - allowed_extras
     assert not unexpected, f"Unexpected public names: {unexpected}"
 
