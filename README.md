@@ -204,7 +204,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 - Only handlers present on the **root logger** at `patch()` time are wrapped. Handlers added later will not be redacted.
 - Named loggers with `propagate=False` and their own handlers bypass root-level redaction.
-- structlog/loguru integrations planned for v0.3.0.
+- For structlog/loguru, use the dedicated integrations (`structlog_processor`, `loguru_sink`) instead of `patch()`.
 - Phone detection is US NANP only.
 
 ## Planned
