@@ -18,15 +18,28 @@ except ImportError:
     _HAS_JSON_LOGGER = False
 
 
+_STANDARD_ATTRS: frozenset[str] | None = None
+
+
+def _get_standard_attrs() -> frozenset[str]:
+    """Cache standard LogRecord attribute names (computed once)."""
+    global _STANDARD_ATTRS  # noqa: PLW0603
+    if _STANDARD_ATTRS is None:
+        _STANDARD_ATTRS = frozenset(
+            logging.LogRecord("", 0, "", 0, None, None, None).__dict__
+        )
+    return _STANDARD_ATTRS
+
+
 class RedactingJsonFormatter(logging.Formatter):
     """A JSON log formatter that redacts PII in structured log records.
 
-    If ``python-json-logger`` is installed, delegates JSON serialization to it.
-    Otherwise, uses a simple built-in JSON serializer.
+    Builds a dict from the log record, redacts all string values via
+    ``PatternRegistry.redact_dict()``, then serializes to JSON.
 
     Usage::
 
-        from hushlog import RedactingJsonFormatter, Config
+        from hushlog import Config, RedactingJsonFormatter
         from hushlog._registry import PatternRegistry
 
         registry = PatternRegistry.from_config(Config())
@@ -85,7 +98,7 @@ class RedactingJsonFormatter(logging.Formatter):
         if record.stack_info:
             log_dict["stack_info"] = record.stack_info
         # Include any extra fields
-        standard_attrs = logging.LogRecord("", 0, "", 0, None, None, None).__dict__.keys()
+        standard_attrs = _get_standard_attrs()
         for key, value in record.__dict__.items():
             if key not in standard_attrs and key not in log_dict:
                 log_dict[key] = value
@@ -108,7 +121,7 @@ class RedactingJsonFormatter(logging.Formatter):
         if record.stack_info:
             log_dict["stack_info"] = record.stack_info
         # Include extra fields
-        standard_attrs = logging.LogRecord("", 0, "", 0, None, None, None).__dict__.keys()
+        standard_attrs = _get_standard_attrs()
         for key, value in record.__dict__.items():
             if key not in standard_attrs and key not in log_dict:
                 log_dict[key] = value
