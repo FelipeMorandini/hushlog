@@ -53,6 +53,8 @@ A frozenset of built-in pattern names to skip. Available names:
 | `cpf` | Brazilian CPF numbers (check digit validated) |
 | `cnpj` | Brazilian CNPJ numbers (check digit validated) |
 | `br_phone` | Brazilian phone numbers |
+| `iban` | International bank account numbers (mod-97 validated) |
+| `eu_vat` | EU VAT numbers (country-prefixed) |
 | `generic_secret` | Generic secrets (label-based) |
 
 ### `mask_style`

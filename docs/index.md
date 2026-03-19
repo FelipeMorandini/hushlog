@@ -7,7 +7,7 @@ HushLog automatically detects and redacts personally identifiable information (P
 ## Features
 
 - **Zero-config** — one call to `hushlog.patch()` and you're done
-- **13 built-in patterns** — email, credit card (Luhn validated), SSN, phone, JWT, AWS keys, Stripe, GitHub tokens, GCP keys, IPv4/IPv6, generic secrets
+- **18 built-in patterns** — email, credit card (Luhn validated), SSN, phone, JWT, AWS keys, Stripe, GitHub tokens, GCP keys, IPv4/IPv6, CPF, CNPJ, BR phone, IBAN, EU VAT, generic secrets
 - **Non-invasive** — wraps existing formatters, no logger rewrites needed
 - **Partial masking** — `j***@e***.com` instead of `[EMAIL REDACTED]`
 - **Ecosystem integrations** — JSON logs, structlog, loguru
