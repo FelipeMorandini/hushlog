@@ -118,9 +118,9 @@
 - [x] Security policy and vulnerability reporting process (SECURITY.md since v0.1.0)
 
 ### 1.0.0: Release
-- [ ] Final audit pass
-- [ ] Stable PyPI release
-- [ ] Go-to-market: r/Python, r/netsec, Hacker News
+- [x] Final audit pass
+- [x] Stable PyPI release
+- [ ] Go-to-market: r/Python, r/netsec, Hacker News (non-code)
 
 ---
 
