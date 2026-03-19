@@ -74,9 +74,9 @@
 ## v0.3.0 — Ecosystem Integrations
 
 ### 0.3.0-alpha.1: JSON Log Redaction
-- [ ] Deep dictionary/list traversal for redacting values in structured log records
-- [ ] Compatibility with `python-json-logger`
-- [ ] Redact both string values and nested structures
+- [x] Deep dictionary/list traversal for redacting values in structured log records
+- [x] Compatibility with `python-json-logger`
+- [x] Redact both string values and nested structures
 
 ### 0.3.0-alpha.2: structlog Support
 - [ ] `hushlog.structlog_processor()` — a structlog processor that redacts event dicts
