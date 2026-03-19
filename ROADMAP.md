@@ -32,8 +32,8 @@
 - [x] First PyPI release candidate
 
 ### 0.1.0: Release
-- [ ] Final testing pass
-- [ ] Tag and release v0.1.0
+- [x] Final testing pass
+- [x] Tag and release v0.1.0
 
 ---
 
