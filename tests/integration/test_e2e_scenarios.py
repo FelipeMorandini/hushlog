@@ -14,7 +14,7 @@ import threading
 import hushlog
 
 
-def _make_handler() -> tuple[logging.StreamHandler[io.StringIO], io.StringIO]:
+def _make_handler() -> tuple[logging.StreamHandler, io.StringIO]:
     """Create a StreamHandler backed by a StringIO buffer."""
     buf = io.StringIO()
     handler = logging.StreamHandler(buf)
@@ -114,7 +114,7 @@ class TestConcurrentLoggingRedaction:
         lock = threading.Lock()
         buf = io.StringIO()
 
-        class ThreadSafeHandler(logging.StreamHandler[io.StringIO]):
+        class ThreadSafeHandler(logging.StreamHandler):
             """StreamHandler that synchronizes writes to the shared buffer."""
 
             def emit(self, record: logging.LogRecord) -> None:
