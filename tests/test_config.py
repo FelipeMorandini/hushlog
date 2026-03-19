@@ -15,11 +15,11 @@ class TestConfigDefaults:
         config = Config()
         assert isinstance(config, Config)
 
-    def test_default_custom_patterns_is_empty_dict(self) -> None:
-        """Default custom_patterns should be an empty dict."""
+    def test_default_custom_patterns_is_empty_mapping(self) -> None:
+        """Default custom_patterns should be an empty immutable mapping."""
         config = Config()
         assert config.custom_patterns == {}
-        assert isinstance(config.custom_patterns, dict)
+        assert len(config.custom_patterns) == 0
 
     def test_default_disable_patterns_is_empty_frozenset(self) -> None:
         """Default disable_patterns should be an empty frozenset."""

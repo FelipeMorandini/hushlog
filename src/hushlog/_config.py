@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import types
 from dataclasses import dataclass, field
 
 
@@ -31,3 +32,8 @@ class Config:
             except re.error as exc:
                 msg = f"Invalid regex for custom pattern {name!r}: {exc}"
                 raise ValueError(msg) from exc
+        # Make custom_patterns immutable to prevent external mutation
+        if isinstance(self.custom_patterns, dict):
+            object.__setattr__(
+                self, "custom_patterns", types.MappingProxyType(dict(self.custom_patterns))
+            )

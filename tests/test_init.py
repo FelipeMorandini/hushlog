@@ -68,6 +68,7 @@ def test_no_unexpected_public_exports() -> None:
         "annotations",
         "logging",
         "threading",
+        "weakref",
         "TYPE_CHECKING",
     }
     unexpected = public_attrs - expected - allowed_extras
