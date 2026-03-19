@@ -26,10 +26,10 @@
 - [x] US phone numbers (multiple formats: parenthesized area code, dashes, dots, spaces)
 
 ### 0.1.0-rc.1: MVP Polish
-- [ ] End-to-end integration tests through Python logging pipeline
-- [ ] Performance baseline benchmarks (ops/sec for redaction)
-- [ ] Complete README with zero-config and advanced usage examples
-- [ ] First PyPI release candidate
+- [x] End-to-end integration tests through Python logging pipeline
+- [x] Performance baseline benchmarks (ops/sec for redaction)
+- [x] Complete README with zero-config and advanced usage examples
+- [x] First PyPI release candidate
 
 ### 0.1.0: Release
 - [ ] Final testing pass
