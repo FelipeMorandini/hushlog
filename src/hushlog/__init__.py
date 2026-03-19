@@ -9,9 +9,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hushlog._config import Config
 
-__version__ = "0.3.0a1"
+__version__ = "0.3.0a2"
 
-__all__ = ["Config", "RedactingJsonFormatter", "patch", "redact_dict", "unpatch"]
+__all__ = [
+    "Config",
+    "RedactingJsonFormatter",
+    "patch",
+    "redact_dict",
+    "structlog_processor",
+    "unpatch",
+]
 
 _patched_formatters: dict[int, logging.Formatter | None] = {}
 _is_patched: bool = False
@@ -101,5 +108,9 @@ def __getattr__(name: str) -> object:
         from hushlog._json_formatter import RedactingJsonFormatter
 
         return RedactingJsonFormatter
+    if name == "structlog_processor":
+        from hushlog._structlog import structlog_processor
+
+        return structlog_processor
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

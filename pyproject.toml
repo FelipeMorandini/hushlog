@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hushlog"
-version = "0.3.0a1"
+version = "0.3.0a2"
 description = "Zero-config PII redaction for Python logging"
 readme = "README.md"
 license = "MIT"
@@ -38,12 +38,16 @@ dev = [
     "mypy>=1.14,<1.19",
     "pre-commit>=4.0",
     "python-json-logger>=3.0",
+    "structlog>=24.0",
 ]
 bench = [
     "pytest-benchmark>=4.0",
 ]
 json = [
     "python-json-logger>=3.0",
+]
+structlog = [
+    "structlog>=24.0",
 ]
 
 [tool.hatch.build.targets.wheel]

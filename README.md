@@ -150,6 +150,29 @@ clean = hushlog.redact_dict(data)
 
 > **Note:** `redact_dict()` creates a new `PatternRegistry` on every call. For repeated use, create a registry once via `PatternRegistry.from_config()` and call `registry.redact_dict()` directly.
 
+### structlog
+
+Use `structlog_processor()` as a processor in your structlog pipeline:
+
+```python
+import structlog
+from hushlog import structlog_processor
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog_processor(),
+        structlog.dev.ConsoleRenderer(),
+    ],
+)
+
+logger = structlog.get_logger()
+logger.info("login", email="alice@corp.com")
+# Output: email=[EMAIL REDACTED]
+```
+
+Install the optional dependency: `pip install hushlog[structlog]`
+
 ## Teardown
 
 Call `unpatch()` to remove HushLog's formatter wrappers and restore the original formatters. This is useful for testing or runtime toggling:
@@ -169,7 +192,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 ## Planned
 
-Structlog/loguru integrations, pattern validation, and more. See the [roadmap](ROADMAP.md) for details.
+Loguru integration, and more. See the [roadmap](ROADMAP.md) for details.
 
 ## Contributing
 
