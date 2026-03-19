@@ -73,6 +73,8 @@ HushLog wraps your existing logging formatters with a `RedactingFormatter` that 
 | CPF | `529.982.247-25` | `[CPF REDACTED]` | Brazilian individual taxpayer ID, check digit validated |
 | CNPJ | `11.222.333/0001-81` | `[CNPJ REDACTED]` | Brazilian company taxpayer ID, check digit validated |
 | BR Phone | `(11) 91234-5678` | `[BR_PHONE REDACTED]` | Brazilian mobile/landline, optional +55 prefix |
+| IBAN | `GB29 NWBK 6016 1331 9268 19` | `[IBAN REDACTED]` | International bank account number, mod-97 validated |
+| EU VAT | `DE123456789` | `[EU_VAT REDACTED]` | EU VAT numbers with country prefix |
 
 ## Configuration
 

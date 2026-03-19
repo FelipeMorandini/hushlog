@@ -14,9 +14,11 @@ from hushlog._patterns import (
     _CPF,
     _CREDIT_CARD,
     _EMAIL,
+    _EU_VAT,
     _GCP_KEY,
     _GENERIC_SECRET,
     _GITHUB_TOKEN,
+    _IBAN,
     _IPV4,
     _IPV6,
     _JWT,
@@ -25,6 +27,7 @@ from hushlog._patterns import (
     _STRIPE_KEY,
     _cnpj_validate,
     _cpf_validate,
+    _iban_validate,
     _ipv4_validate,
     _ipv6_validate,
     _luhn_check,
@@ -46,7 +49,7 @@ class TestGetBuiltinPatterns:
         assert isinstance(result, tuple)
 
     def test_count(self) -> None:
-        assert len(get_builtin_patterns()) == 16
+        assert len(get_builtin_patterns()) == 18
 
     def test_all_are_pattern_entries(self) -> None:
         for entry in get_builtin_patterns():
@@ -69,6 +72,8 @@ class TestGetBuiltinPatterns:
             "cpf",
             "cnpj",
             "br_phone",
+            "iban",
+            "eu_vat",
             "generic_secret",
             "email",
             "phone",
@@ -1627,3 +1632,170 @@ class TestBRPhonePattern:
         assert _BR_PHONE.heuristic is not None
         assert _BR_PHONE.heuristic("no parens here") is False
         assert _BR_PHONE.heuristic("has (paren)") is True
+
+
+# ---------------------------------------------------------------------------
+# IBAN validator
+# ---------------------------------------------------------------------------
+
+
+class TestIBANValidator:
+    """Validate the IBAN mod-97 algorithm implementation."""
+
+    @pytest.mark.parametrize(
+        "iban",
+        [
+            "GB29 NWBK 6016 1331 9268 19",  # UK
+            "DE89 3704 0044 0532 0130 00",  # Germany
+            "FR76 3000 6000 0112 3456 7890 189",  # France
+            "GB29NWBK60161331926819",  # UK without spaces
+            "DE89370400440532013000",  # Germany without spaces
+        ],
+    )
+    def test_valid_ibans(self, iban: str) -> None:
+        assert _iban_validate(iban) is True
+
+    @pytest.mark.parametrize(
+        "iban",
+        [
+            "GB29 NWBK 6016 1331 9268 18",  # Wrong check (last digit changed)
+            "DE00 3704 0044 0532 0130 00",  # Invalid check digits
+            "XX12 3456 7890 1234",  # Valid format but will fail mod-97
+        ],
+    )
+    def test_invalid_check_digits(self, iban: str) -> None:
+        assert _iban_validate(iban) is False
+
+    def test_too_short(self) -> None:
+        assert _iban_validate("GB29 NWBK 6016") is False
+
+    def test_too_long(self) -> None:
+        assert _iban_validate("GB29 NWBK 6016 1331 9268 1900 0000 0000 0000") is False
+
+    def test_lowercase_country_rejected(self) -> None:
+        assert _iban_validate("gb29 NWBK 6016 1331 9268 19") is False
+
+    def test_non_digit_check_chars_rejected(self) -> None:
+        assert _iban_validate("GBXX NWBK 6016 1331 9268 19") is False
+
+
+# ---------------------------------------------------------------------------
+# IBAN pattern
+# ---------------------------------------------------------------------------
+
+
+class TestIBANPattern:
+    """Test IBAN regex + validator integration."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_IBAN)
+        return registry.redact(text)
+
+    def test_uk_iban_with_spaces(self) -> None:
+        result = self._redact("IBAN: GB29 NWBK 6016 1331 9268 19")
+        assert "[IBAN REDACTED]" in result
+        assert "GB29" not in result
+
+    def test_german_iban_with_spaces(self) -> None:
+        result = self._redact("IBAN: DE89 3704 0044 0532 0130 00")
+        assert "[IBAN REDACTED]" in result
+        assert "DE89" not in result
+
+    def test_french_iban_with_spaces(self) -> None:
+        result = self._redact("IBAN: FR76 3000 6000 0112 3456 7890 189")
+        assert "[IBAN REDACTED]" in result
+        assert "FR76" not in result
+
+    def test_iban_without_spaces(self) -> None:
+        result = self._redact("IBAN: GB29NWBK60161331926819")
+        assert "[IBAN REDACTED]" in result
+        assert "GB29NWBK" not in result
+
+    def test_invalid_check_digit_not_redacted(self) -> None:
+        result = self._redact("IBAN: GB29 NWBK 6016 1331 9268 18")
+        assert "[IBAN REDACTED]" not in result
+
+    def test_too_short_not_matched(self) -> None:
+        result = self._redact("IBAN: GB29 NWBK")
+        assert "[IBAN REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("IBAN: GB29NWBK60161331926819")
+        # Country code (GB) + ** + masked middle + last 4 (6819)
+        assert "GB**" in result
+        assert "6819" in result
+        assert "GB29NWBK" not in result
+
+    def test_no_heuristic(self) -> None:
+        """IBAN has no heuristic (None)."""
+        assert _IBAN.heuristic is None
+
+
+# ---------------------------------------------------------------------------
+# EU VAT pattern
+# ---------------------------------------------------------------------------
+
+
+class TestEUVATPattern:
+    """Test EU VAT number pattern."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_EU_VAT)
+        return registry.redact(text)
+
+    def test_german_vat(self) -> None:
+        result = self._redact("VAT: DE123456789")
+        assert "[EU_VAT REDACTED]" in result
+        assert "DE123456789" not in result
+
+    def test_french_vat(self) -> None:
+        result = self._redact("VAT: FR12345678901")
+        assert "[EU_VAT REDACTED]" in result
+        assert "FR12345678901" not in result
+
+    def test_dutch_vat(self) -> None:
+        result = self._redact("VAT: NL123456789B01")
+        assert "[EU_VAT REDACTED]" in result
+        assert "NL123456789B01" not in result
+
+    def test_gb_vat(self) -> None:
+        result = self._redact("VAT: GB123456789")
+        assert "[EU_VAT REDACTED]" in result
+        assert "GB123456789" not in result
+
+    def test_invalid_country_prefix_not_matched(self) -> None:
+        """Two-letter prefix not in EU VAT country list should NOT match."""
+        result = self._redact("VAT: XX123456789")
+        assert "[EU_VAT REDACTED]" not in result
+        assert "XX123456789" in result
+
+    def test_too_short_not_matched(self) -> None:
+        """Fewer than 8 chars after prefix should NOT match."""
+        result = self._redact("VAT: DE12345")
+        assert "[EU_VAT REDACTED]" not in result
+
+    def test_too_long_not_matched(self) -> None:
+        """More than 12 chars after prefix should NOT match."""
+        result = self._redact("VAT: DE1234567890123")
+        assert "[EU_VAT REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("VAT: DE123456789")
+        # Country prefix (DE) + masked middle + last 3 (789)
+        assert "DE" in result
+        assert "789" in result
+        assert "DE123456789" not in result
+
+    def test_no_heuristic(self) -> None:
+        """EU VAT has no heuristic (None)."""
+        assert _EU_VAT.heuristic is None

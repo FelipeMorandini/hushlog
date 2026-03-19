@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from hushlog._registry import PatternRegistry as PatternRegistry
     from hushlog._structlog import structlog_processor as structlog_processor
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "Config",

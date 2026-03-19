@@ -84,6 +84,31 @@ def _cnpj_validate(text: str) -> bool:
     return digits[13] == check2
 
 
+def _iban_validate(text: str) -> bool:
+    """Validate an IBAN using the mod-97 algorithm (ISO 7064)."""
+    # Remove spaces
+    cleaned = "".join(c for c in text if c != " ")
+    if len(cleaned) < 15 or len(cleaned) > 34:
+        return False
+    # First 2 chars must be uppercase letters
+    if not cleaned[:2].isalpha() or not cleaned[:2].isupper():
+        return False
+    # Next 2 chars must be digits
+    if not cleaned[2:4].isdigit():
+        return False
+    # Move first 4 chars to end, convert letters to numbers (A=10, B=11, ...)
+    rearranged = cleaned[4:] + cleaned[:4]
+    numeric = ""
+    for c in rearranged:
+        if c.isdigit():
+            numeric += c
+        elif c.isalpha():
+            numeric += str(ord(c.upper()) - 55)  # A=10, B=11, ..., Z=35
+        else:
+            return False
+    return int(numeric) % 97 == 1
+
+
 def _ipv6_validate(text: str) -> bool:
     """Validate an IPv6 address using the standard library."""
     try:
@@ -196,6 +221,22 @@ def _partial_mask_br_phone(m: re.Match[str], mc: str) -> str:
     digits = [c for c in m.group() if c in _ASCII_DIGITS]
     last4 = "".join(digits[-4:])
     return f"({mc * 2}) {mc * 5}-{last4}"
+
+
+def _partial_mask_iban(m: re.Match[str], mc: str) -> str:
+    cleaned = "".join(c for c in m.group() if c != " ")
+    country = cleaned[:2]
+    last4 = cleaned[-4:]
+    middle_len = len(cleaned) - 6
+    return f"{country}{mc * 2} {mc * middle_len} {last4}"
+
+
+def _partial_mask_eu_vat(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    prefix = text[:2]
+    last3 = text[-3:]
+    middle_len = len(text) - 5
+    return f"{prefix}{mc * middle_len}{last3}"
 
 
 def _partial_mask_generic_secret(m: re.Match[str], mc: str) -> str:
@@ -518,6 +559,41 @@ _BR_PHONE = PatternEntry(
 )
 
 
+# --- IBAN (International Bank Account Number) ---
+# Matches 2 uppercase letters (country code) + 2 digits (check) + up to 30 alphanumeric chars.
+# Handles both spaced (GB29 NWBK 6016 1331 9268 19) and unspaced formats.
+# Validated via mod-97 algorithm (ISO 7064 / ISO 13616).
+_IBAN_RE = re.compile(
+    r"\b[A-Z]{2}[0-9]{2}[\s]?[A-Z0-9]{4}(?:[\s]?[A-Z0-9]{4}){2,7}(?:[\s]?[A-Z0-9]{1,4})?\b"
+)
+
+_IBAN = PatternEntry(
+    name="iban",
+    regex=_IBAN_RE,
+    heuristic=None,
+    mask="[IBAN REDACTED]",
+    validator=_iban_validate,
+    partial_masker=_partial_mask_iban,
+)
+
+
+# --- EU VAT Number ---
+# Matches 2-letter country prefix + 8-12 alphanumeric characters.
+# Covers EU member states + GB and XI (Northern Ireland).
+_EU_VAT_RE = re.compile(
+    r"\b(?:AT|BE|BG|CY|CZ|DE|DK|EE|EL|ES|FI|FR|HR|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK|XI|GB)"
+    r"[A-Z0-9]{8,12}\b"
+)
+
+_EU_VAT = PatternEntry(
+    name="eu_vat",
+    regex=_EU_VAT_RE,
+    heuristic=None,
+    mask="[EU_VAT REDACTED]",
+    partial_masker=_partial_mask_eu_vat,
+)
+
+
 # --- Generic Secret ---
 # Context-dependent: matches values after common secret-related labels.
 # Replaces the entire match (label + value) to avoid leaking context.
@@ -564,6 +640,7 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
     - Specific patterns with fixed prefixes (credit_card, ssn, API keys) first
     - IPv6 before IPv4 to catch ::ffff:x.x.x.x mapped addresses first
     - CPF/CNPJ/BR phone after IPv4 — formatted with check digits, specific enough
+    - IBAN/EU VAT after BR patterns — validated with mod-97 / prefix matching
     - Context-dependent patterns (generic_secret) before general patterns (email)
       because email redaction inserts spaces that break generic_secret's ``\\S{8,128}``
     - Broadest patterns (email, phone) last to avoid consuming text needed by
@@ -583,6 +660,8 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
         _CPF,
         _CNPJ,
         _BR_PHONE,
+        _IBAN,
+        _EU_VAT,
         _GENERIC_SECRET,
         _EMAIL,
         _PHONE,

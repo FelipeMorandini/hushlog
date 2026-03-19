@@ -165,11 +165,11 @@
 - [ ] RG (regional ID, variable format)
 
 **European Union (`hushlog[eu]`):**
-- [ ] IBAN (2-letter country + 2 check digits + up to 30 alphanumeric)
+- [x] IBAN (2-letter country + 2 check digits + up to 30 alphanumeric)
 - [ ] UK National Insurance Number (NI: `XX 00 00 00 X`)
 - [ ] Netherlands BSN (9 digits with 11-check)
 - [ ] German Personalausweisnummer
-- [ ] EU VAT numbers (country-prefixed)
+- [x] EU VAT numbers (country-prefixed)
 
 **India (`hushlog[in]`):**
 - [ ] Aadhaar (12 digits with Verhoeff checksum)
