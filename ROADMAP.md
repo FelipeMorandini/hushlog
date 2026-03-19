@@ -49,8 +49,8 @@
 - [x] JWT tokens (3-5 base64url segments separated by dots)
 
 ### 0.2.0-alpha.2: IPv4 & IPv6 Redaction
-- [ ] IPv4 addresses (with validation, excluding version-number false positives)
-- [ ] IPv6 addresses (full, compressed, and mixed formats)
+- [x] IPv4 addresses (with validation, excluding version-number false positives)
+- [x] IPv6 addresses (full, compressed, and mixed formats)
 
 ### 0.2.0-alpha.3: Partial Masking
 - [ ] `Config` dataclass with `mask_character` option

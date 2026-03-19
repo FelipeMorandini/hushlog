@@ -457,6 +457,76 @@ class TestGenericSecretThroughPipeline:
             root.setLevel(original_level)
 
 
+class TestIPv4RedactionThroughPipeline:
+    """Verify IPv4 redaction through the full logging pipeline."""
+
+    def test_ipv4_redaction_through_pipeline(self) -> None:
+        """Log a message containing an IPv4 address and verify it is redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("test.ipv4")
+            logger.info("Connected from 192.168.1.100")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[IPV4 REDACTED]" in output
+            assert "192.168.1.100" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
+class TestIPv6RedactionThroughPipeline:
+    """Verify IPv6 redaction through the full logging pipeline."""
+
+    def test_ipv6_redaction_through_pipeline(self) -> None:
+        """Log a message containing a full IPv6 address and verify it is redacted."""
+        root = logging.getLogger()
+        original_handlers = list(root.handlers)
+        original_level = root.level
+
+        handler, buf = _make_handler()
+
+        try:
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            root.addHandler(handler)
+            root.setLevel(logging.DEBUG)
+
+            hushlog.patch()
+
+            logger = logging.getLogger("test.ipv6")
+            logger.info("Peer address: 2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+            handler.flush()
+            output = buf.getvalue()
+
+            assert "[IPV6 REDACTED]" in output
+            assert "2001:0db8:85a3:0000:0000:8a2e:0370:7334" not in output
+        finally:
+            hushlog.unpatch()
+            for h in root.handlers[:]:
+                root.removeHandler(h)
+            for h in original_handlers:
+                root.addHandler(h)
+            root.setLevel(original_level)
+
+
 class TestDisableApiKeyPatterns:
     """Verify disable_patterns correctly skips API key and JWT patterns."""
 

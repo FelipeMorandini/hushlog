@@ -14,10 +14,14 @@ from hushlog._patterns import (
     _GCP_KEY,
     _GENERIC_SECRET,
     _GITHUB_TOKEN,
+    _IPV4,
+    _IPV6,
     _JWT,
     _PHONE,
     _SSN,
     _STRIPE_KEY,
+    _ipv4_validate,
+    _ipv6_validate,
     _luhn_check,
     get_builtin_patterns,
 )
@@ -37,7 +41,7 @@ class TestGetBuiltinPatterns:
         assert isinstance(result, tuple)
 
     def test_count(self) -> None:
-        assert len(get_builtin_patterns()) == 11
+        assert len(get_builtin_patterns()) == 13
 
     def test_all_are_pattern_entries(self) -> None:
         for entry in get_builtin_patterns():
@@ -55,6 +59,8 @@ class TestGetBuiltinPatterns:
             "stripe_key",
             "github_token",
             "gcp_key",
+            "ipv6",
+            "ipv4",
             "generic_secret",
             "email",
             "phone",
@@ -302,9 +308,10 @@ class TestFalsePositives:
         return registry.redact(text)
 
     def test_ipv4_not_phone(self) -> None:
-        """IP addresses should not be matched as phone numbers."""
+        """IP addresses should be matched as IPv4, not as phone numbers."""
         result = self._redact_all("server 192.168.1.100")
         assert "[PHONE REDACTED]" not in result
+        assert "[IPV4 REDACTED]" in result
 
     def test_version_number_not_phone(self) -> None:
         """Version strings should not be matched."""
@@ -1033,3 +1040,251 @@ class TestMixedAPIKeysAndPII:
         assert "[SSN REDACTED]" in result
         assert "sk_test_" not in result
         assert "123-45-6789" not in result
+
+
+# ---------------------------------------------------------------------------
+# IPv4 validator
+# ---------------------------------------------------------------------------
+
+
+class TestIPv4Validate:
+    """Validate the IPv4 address validator."""
+
+    def test_valid_common_addresses(self) -> None:
+        assert _ipv4_validate("192.168.1.1") is True
+        assert _ipv4_validate("10.0.0.1") is True
+        assert _ipv4_validate("8.8.8.8") is True
+        assert _ipv4_validate("255.255.255.255") is True
+        assert _ipv4_validate("0.0.0.0") is True
+
+    def test_invalid_octet_over_255(self) -> None:
+        assert _ipv4_validate("256.1.1.1") is False
+        assert _ipv4_validate("1.1.1.999") is False
+
+    def test_leading_zeros_rejected(self) -> None:
+        assert _ipv4_validate("192.168.01.1") is False
+        assert _ipv4_validate("01.01.01.01") is False
+
+    def test_wrong_part_count(self) -> None:
+        assert _ipv4_validate("1.2.3") is False
+        assert _ipv4_validate("1.2.3.4.5") is False
+
+    def test_empty_parts(self) -> None:
+        assert _ipv4_validate("1..2.3") is False
+        assert _ipv4_validate("") is False
+
+
+# ---------------------------------------------------------------------------
+# IPv6 validator
+# ---------------------------------------------------------------------------
+
+
+class TestIPv6Validate:
+    """Validate the IPv6 address validator."""
+
+    def test_full_address(self) -> None:
+        assert _ipv6_validate("2001:0db8:85a3:0000:0000:8a2e:0370:7334") is True
+
+    def test_compressed_address(self) -> None:
+        assert _ipv6_validate("::1") is True
+        assert _ipv6_validate("fe80::1") is True
+        assert _ipv6_validate("::") is True
+
+    def test_loopback(self) -> None:
+        assert _ipv6_validate("::1") is True
+
+    def test_ipv4_mapped(self) -> None:
+        assert _ipv6_validate("::ffff:192.168.1.1") is True
+
+    def test_invalid_addresses(self) -> None:
+        assert _ipv6_validate("not-an-ipv6") is False
+        assert _ipv6_validate("192.168.1.1") is False
+        assert _ipv6_validate("") is False
+
+
+# ---------------------------------------------------------------------------
+# IPv4 pattern
+# ---------------------------------------------------------------------------
+
+
+class TestIPv4Pattern:
+    """Test IPv4 regex + validator integration."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_IPV4)
+        return registry.redact(text)
+
+    def test_simple_ipv4(self) -> None:
+        assert self._redact("server 192.168.1.1") == "server [IPV4 REDACTED]"
+
+    def test_google_dns(self) -> None:
+        """8.8.8.8 (all single-digit octets) must be matched."""
+        assert self._redact("dns: 8.8.8.8") == "dns: [IPV4 REDACTED]"
+
+    def test_localhost(self) -> None:
+        assert self._redact("host: 127.0.0.1") == "host: [IPV4 REDACTED]"
+
+    def test_broadcast(self) -> None:
+        assert self._redact("broadcast: 255.255.255.255") == "broadcast: [IPV4 REDACTED]"
+
+    def test_zero_address(self) -> None:
+        assert self._redact("addr: 0.0.0.0") == "addr: [IPV4 REDACTED]"
+
+    def test_ip_in_url(self) -> None:
+        """IPs after :// in URLs should still match."""
+        result = self._redact("http://192.168.1.1/path")
+        assert "[IPV4 REDACTED]" in result
+
+    def test_multiple_ips(self) -> None:
+        result = self._redact("src 10.0.0.1 dst 10.0.0.2")
+        assert result == "src [IPV4 REDACTED] dst [IPV4 REDACTED]"
+
+    def test_invalid_octet_not_redacted(self) -> None:
+        """Octets > 255 should NOT be redacted (validator rejects)."""
+        assert self._redact("addr: 999.999.999.999") == "addr: 999.999.999.999"
+
+    def test_leading_zeros_not_redacted(self) -> None:
+        """Leading zeros should NOT be redacted (validator rejects)."""
+        assert self._redact("addr: 192.168.01.1") == "addr: 192.168.01.1"
+
+    def test_version_string_not_matched(self) -> None:
+        """v1.2.3.4 should NOT match (lookbehind blocks alphanumeric prefix)."""
+        assert self._redact("version v1.2.3.4") == "version v1.2.3.4"
+
+    def test_package_version_not_matched(self) -> None:
+        """pkg@1.2.3.4 should NOT match (lookbehind blocks @)."""
+        assert self._redact("pkg@1.2.3.4") == "pkg@1.2.3.4"
+
+    def test_five_octets_not_matched(self) -> None:
+        """1.2.3.4.5 should not produce a match (lookahead blocks trailing dot)."""
+        result = self._redact("1.2.3.4.5")
+        assert "[IPV4 REDACTED]" not in result
+
+
+# ---------------------------------------------------------------------------
+# IPv6 pattern
+# ---------------------------------------------------------------------------
+
+
+class TestIPv6Pattern:
+    """Test IPv6 regex + validator integration."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_IPV6)
+        return registry.redact(text)
+
+    def test_full_ipv6(self) -> None:
+        assert (
+            self._redact("addr: 2001:0db8:85a3:0000:0000:8a2e:0370:7334") == "addr: [IPV6 REDACTED]"
+        )
+
+    def test_loopback(self) -> None:
+        assert self._redact("addr: ::1") == "addr: [IPV6 REDACTED]"
+
+    def test_compressed(self) -> None:
+        assert self._redact("addr: fe80::1") == "addr: [IPV6 REDACTED]"
+
+    def test_ipv4_mapped(self) -> None:
+        assert self._redact("addr: ::ffff:192.168.1.1") == "addr: [IPV6 REDACTED]"
+
+    def test_double_colon_only(self) -> None:
+        assert self._redact("addr: ::") == "addr: [IPV6 REDACTED]"
+
+    def test_heuristic_skips_no_colon(self) -> None:
+        assert _IPV6.heuristic is not None
+        assert _IPV6.heuristic("no colons here") is False
+        assert _IPV6.heuristic("has:colon") is True
+
+    def test_not_a_valid_ipv6(self) -> None:
+        """Random hex with colons that doesn't form valid IPv6 should not be redacted."""
+        # gggg is not valid hex for IPv6
+        result = self._redact("addr: gggg::1")
+        assert "[IPV6 REDACTED]" not in result
+
+    def test_time_not_matched(self) -> None:
+        """10:30:45 (a time string) should NOT be matched as IPv6."""
+        result = self._redact("meeting at 10:30:45 today")
+        assert "[IPV6 REDACTED]" not in result
+        assert "10:30:45" in result
+
+    def test_mac_address_not_matched(self) -> None:
+        """aa:bb:cc:dd:ee:ff (a MAC address) should NOT be matched as IPv6."""
+        result = self._redact("MAC aa:bb:cc:dd:ee:ff")
+        assert "[IPV6 REDACTED]" not in result
+        assert "aa:bb:cc:dd:ee:ff" in result
+
+
+# ---------------------------------------------------------------------------
+# IPv4 additional coverage
+# ---------------------------------------------------------------------------
+
+
+class TestIPv4AdditionalCoverage:
+    """Additional IPv4 edge cases."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_IPV4)
+        return registry.redact(text)
+
+    def test_google_dns_single_digit_octets(self) -> None:
+        """8.8.8.8 — all single-digit octets must be redacted."""
+        assert self._redact("dns 8.8.8.8") == "dns [IPV4 REDACTED]"
+
+    def test_ip_in_url_with_port(self) -> None:
+        """IP in URL with port: http://192.168.1.1:8080 should be redacted."""
+        result = self._redact("http://192.168.1.1:8080/path")
+        assert "[IPV4 REDACTED]" in result
+        assert "192.168.1.1" not in result
+
+    def test_zero_address(self) -> None:
+        """0.0.0.0 is a valid IPv4 address."""
+        assert self._redact("bind 0.0.0.0") == "bind [IPV4 REDACTED]"
+
+    def test_subnet_mask(self) -> None:
+        """255.255.255.0 is a valid IPv4 address."""
+        assert self._redact("mask 255.255.255.0") == "mask [IPV4 REDACTED]"
+
+
+# ---------------------------------------------------------------------------
+# Mixed IPv4 + IPv6 redaction
+# ---------------------------------------------------------------------------
+
+
+class TestMixedIPRedaction:
+    """Test that both IPv4 and IPv6 are redacted in the same string."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_IPV6)
+        registry.register(_IPV4)
+        return registry.redact(text)
+
+    def test_both_ipv4_and_ipv6_redacted(self) -> None:
+        """A string containing both IPv4 and IPv6 addresses should redact both."""
+        result = self._redact("src 192.168.1.1 dst 2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+        assert "[IPV4 REDACTED]" in result
+        assert "[IPV6 REDACTED]" in result
+        assert "192.168.1.1" not in result
+        assert "2001:0db8" not in result
+
+
+# ---------------------------------------------------------------------------
+# IP + Email cross-pattern redaction
+# ---------------------------------------------------------------------------
+
+
+class TestIPAndEmailRedaction:
+    """Test that IP and email patterns redact independently in the same string."""
+
+    def test_ip_and_email_both_redacted(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_IPV4)
+        registry.register(_EMAIL)
+        result = registry.redact("user admin@example.com from 10.0.0.1")
+        assert "[IPV4 REDACTED]" in result
+        assert "[EMAIL REDACTED]" in result
+        assert "10.0.0.1" not in result
+        assert "admin@example.com" not in result

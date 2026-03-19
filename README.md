@@ -68,6 +68,8 @@ HushLog wraps your existing logging formatters with a `RedactingFormatter` that 
 | GitHub Token | `ghp_xxxx...` | `[GITHUB_TOKEN REDACTED]` | Classic + fine-grained (`github_pat_`) |
 | GCP API Key | `AIzaSyA...` | `[GCP_KEY REDACTED]` | AIza-prefixed keys |
 | Generic Secret | `password=MyS3cret` | `[SECRET REDACTED]` | Label-based (password, secret, api_key, etc.) |
+| IPv4 | `192.168.1.1` | `[IPV4 REDACTED]` | Octet-validated, rejects version strings |
+| IPv6 | `2001:db8::8a2e:370:7334` | `[IPV6 REDACTED]` | Full, compressed, and mixed forms |
 
 ## Configuration
 
@@ -103,7 +105,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 ## Planned
 
-IPv4/IPv6 addresses, partial masking, structlog/loguru integrations, and more. See the [roadmap](ROADMAP.md) for details.
+Partial masking, structlog/loguru integrations, and more. See the [roadmap](ROADMAP.md) for details.
 
 ## Contributing
 
