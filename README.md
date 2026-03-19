@@ -38,27 +38,40 @@ hushlog.patch()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("Processing complete")
+logger.info("User email: john@example.com")
+# Output: User email: [EMAIL REDACTED]
+
+logger.info("Card: 4111-1111-1111-1111")
+# Output: Card: [CREDIT_CARD REDACTED]
 ```
 
-> **Note:** This is v0.1.0-alpha.1 — the project scaffolding release. PII redaction patterns are being implemented and will land in upcoming alpha releases. See the [roadmap](ROADMAP.md) for details.
+## What Gets Redacted
 
-## Planned Redaction Patterns
+| Pattern      | Example Input             | Redacted Output          |
+| ------------ | ------------------------- | ------------------------ |
+| Email        | `john@example.com`        | `[EMAIL REDACTED]`       |
+| Credit Card  | `4111-1111-1111-1111`     | `[CREDIT_CARD REDACTED]` |
+| SSN          | `123-45-6789`             | `[SSN REDACTED]`         |
+| Phone        | `(555) 123-4567`          | `[PHONE REDACTED]`       |
 
-The following patterns will be supported by v0.1.0:
+Credit card detection includes Luhn checksum validation to minimize false positives.
 
-| Pattern      | Example Input                              | Redacted Output           |
-| ------------ | ------------------------------------------ | ------------------------- |
-| Email        | `john@example.com`                         | `[EMAIL REDACTED]`        |
-| Credit Card  | `4111-1111-1111-1111`                      | `[CREDIT_CARD REDACTED]`  |
-| SSN          | `123-45-6789`                              | `[SSN REDACTED]`          |
-| Phone        | `+1 (555) 123-4567`                        | `[PHONE REDACTED]`        |
-| IPv4         | `192.168.1.1`                              | `[IPV4 REDACTED]`         |
-| IPv6         | `2001:0db8:85a3::8a2e:0370:7334`          | `[IPV6 REDACTED]`         |
-| AWS Key      | `AKIAIOSFODNN7EXAMPLE`                     | `[AWS_KEY REDACTED]`      |
-| Stripe Key   | `sk_live_abc123...`                        | `[STRIPE_KEY REDACTED]`   |
-| GitHub Token | `ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` | `[GITHUB_TOKEN REDACTED]` |
-| JWT          | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` | `[JWT REDACTED]`          |
+## Planned Patterns (v0.2.0+)
+
+IPv4/IPv6 addresses, AWS keys, Stripe keys, GitHub tokens, JWT tokens, and more. See the [roadmap](ROADMAP.md) for details.
+
+## Configuration
+
+Disable specific patterns or add custom ones:
+
+```python
+from hushlog import Config
+
+hushlog.patch(Config(
+    disable_patterns=frozenset({"phone"}),
+    custom_patterns={"internal_id": r"ID-[A-Z]{3}-\d{6}"},
+))
+```
 
 ## Contributing
 

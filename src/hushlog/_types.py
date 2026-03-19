@@ -10,9 +10,10 @@ if TYPE_CHECKING:
 
 
 class PatternEntry(NamedTuple):
-    """A single redaction pattern with optional heuristic pre-check."""
+    """A single redaction pattern with optional heuristic pre-check and validator."""
 
     name: str
     regex: re.Pattern[str]
     heuristic: Callable[[str], bool] | None
     mask: str
+    validator: Callable[[str], bool] | None = None
