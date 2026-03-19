@@ -79,8 +79,8 @@
 - [x] Redact both string values and nested structures
 
 ### 0.3.0-alpha.2: structlog Support
-- [ ] `hushlog.structlog_processor()` — a structlog processor that redacts event dicts
-- [ ] Integration test with structlog pipeline
+- [x] `hushlog.structlog_processor()` — a structlog processor that redacts event dicts
+- [x] Integration test with structlog pipeline
 
 ### 0.3.0-alpha.3: loguru Support
 - [ ] `hushlog.loguru_patcher()` — a loguru patcher/sink wrapper

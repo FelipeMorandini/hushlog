@@ -40,6 +40,7 @@ def test_all_exports_are_complete() -> None:
         "Config",
         "RedactingJsonFormatter",
         "redact_dict",
+        "structlog_processor",
     }
 
 
@@ -52,7 +53,14 @@ def test_all_exports_resolve() -> None:
 def test_no_unexpected_public_exports() -> None:
     """Module does not leak private implementation names as public attributes."""
     public_attrs = {n for n in dir(hushlog) if not n.startswith("_")}
-    expected = {"patch", "unpatch", "Config", "RedactingJsonFormatter", "redact_dict"}
+    expected = {
+        "patch",
+        "unpatch",
+        "Config",
+        "RedactingJsonFormatter",
+        "redact_dict",
+        "structlog_processor",
+    }
     # Allow standard module-level names that Python or packaging may add
     allowed_extras = {
         "annotations",

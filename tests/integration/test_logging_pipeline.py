@@ -31,11 +31,18 @@ class TestPackageStructure:
 
     def test_version_matches_pep440(self) -> None:
         """Version string is present and looks like a PEP 440 version."""
-        assert hushlog.__version__ == "0.3.0a1"
+        assert hushlog.__version__ == "0.3.0a2"
 
     def test_all_exports(self) -> None:
         """__all__ lists exactly the public API surface."""
-        expected = {"patch", "unpatch", "Config", "RedactingJsonFormatter", "redact_dict"}
+        expected = {
+            "patch",
+            "unpatch",
+            "Config",
+            "RedactingJsonFormatter",
+            "redact_dict",
+            "structlog_processor",
+        }
         assert set(hushlog.__all__) == expected
 
     def test_py_typed_marker_exists(self) -> None:
