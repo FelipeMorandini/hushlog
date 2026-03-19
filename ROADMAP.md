@@ -96,13 +96,13 @@
 ## v1.0.0 — Production Ready
 
 ### 1.0.0-rc.1: Performance & Reliability
-- [ ] Comprehensive benchmarks: latency per log line, throughput under load
-- [ ] Benchmark CI gate (fail if redaction adds >X% overhead)
-- [ ] 100% test coverage
-- [ ] Fuzz testing for regex patterns (ReDoS detection)
-- [ ] Thread-safety verification under concurrent logging
+- [x] Comprehensive benchmarks: latency per log line, throughput under load
+- [x] Benchmark CI gate (fail if redaction adds >X% overhead)
+- [x] 100% test coverage
+- [x] Fuzz testing for regex patterns (ReDoS detection)
+- [x] Thread-safety verification under concurrent logging
 - [ ] ReDoS validation for custom patterns (reject or warn on catastrophic backtracking)
-- [ ] Unicode normalization (NFC) before redaction to prevent homograph bypasses
+- [x] Unicode normalization (NFC) before redaction to prevent homograph bypasses
 
 ### 1.0.0-rc.2: Hardening
 - [ ] Track patched handlers via `weakref.WeakKeyDictionary` instead of `id()` to handle handler removal
@@ -121,3 +121,45 @@
 - [ ] Final audit pass
 - [ ] Stable PyPI release
 - [ ] Go-to-market: r/Python, r/netsec, Hacker News
+
+---
+
+## Future — Internationalization (i18n)
+
+> HushLog v0.1–v1.0 is US-centric for region-specific patterns (SSN, phone). International
+> support is planned as optional region packs to avoid bloating the core pattern set.
+
+### Region Packs (optional extras)
+
+**Brazil (`hushlog[br]`):**
+- [ ] CPF (`XXX.XXX.XXX-XX` with check digit validation)
+- [ ] CNPJ (`XX.XXX.XXX/XXXX-XX`)
+- [ ] Brazilian phone numbers (+55 formats, 10-11 digits)
+- [ ] RG (regional ID, variable format)
+
+**European Union (`hushlog[eu]`):**
+- [ ] IBAN (2-letter country + 2 check digits + up to 30 alphanumeric)
+- [ ] UK National Insurance Number (NI: `XX 00 00 00 X`)
+- [ ] Netherlands BSN (9 digits with 11-check)
+- [ ] German Personalausweisnummer
+- [ ] EU VAT numbers (country-prefixed)
+
+**India (`hushlog[in]`):**
+- [ ] Aadhaar (12 digits with Verhoeff checksum)
+- [ ] PAN (`XXXXX0000X` format)
+- [ ] Indian phone numbers (+91 formats)
+
+**Canada (`hushlog[ca]`):**
+- [ ] SIN (`XXX-XXX-XXX` with Luhn validation)
+- [ ] Canadian phone numbers (+1, same NANP as US — already covered)
+
+**International:**
+- [ ] E.164 phone numbers (global format: `+` country code + subscriber)
+- [ ] Passport numbers (per-country regex with configurable country set)
+- [ ] SWIFT/BIC codes (8 or 11 alphanumeric)
+
+### Architecture
+- Region packs register additional `PatternEntry` objects via a plugin mechanism
+- Each pack is an optional dependency: `pip install hushlog[br]`
+- Core library remains zero-dependency and US-focused
+- Users can always add custom patterns via `Config.custom_patterns` for unsupported regions
