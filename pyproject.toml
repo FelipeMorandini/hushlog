@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hushlog"
-version = "1.0.0rc2"
+version = "1.0.0rc3"
 description = "Zero-config PII redaction for Python logging"
 readme = "README.md"
 license = "MIT"
@@ -53,6 +53,10 @@ structlog = [
 ]
 loguru = [
     "loguru>=0.7",
+]
+docs = [
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.24",
 ]
 
 [tool.hatch.build.targets.wheel]
