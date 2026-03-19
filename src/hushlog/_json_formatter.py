@@ -25,9 +25,7 @@ def _get_standard_attrs() -> frozenset[str]:
     """Cache standard LogRecord attribute names (computed once)."""
     global _STANDARD_ATTRS  # noqa: PLW0603
     if _STANDARD_ATTRS is None:
-        _STANDARD_ATTRS = frozenset(
-            logging.LogRecord("", 0, "", 0, None, None, None).__dict__
-        )
+        _STANDARD_ATTRS = frozenset(logging.LogRecord("", 0, "", 0, None, None, None).__dict__)
     return _STANDARD_ATTRS
 
 
