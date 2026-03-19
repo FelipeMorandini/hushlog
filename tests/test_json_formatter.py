@@ -158,6 +158,37 @@ class TestWorksWithoutPythonJsonLogger:
         assert "user@example.com" not in parsed["message"]
 
 
+class TestFromConfig:
+    """Verify RedactingJsonFormatter.from_config() convenience constructor."""
+
+    def test_from_config_default(self) -> None:
+        """from_config() with no args creates a working formatter."""
+        formatter = RedactingJsonFormatter.from_config()
+        record = _make_record("Contact user@example.com")
+        output = formatter.format(record)
+        parsed = json.loads(output)
+        assert "[EMAIL REDACTED]" in parsed["message"]
+        assert "user@example.com" not in parsed["message"]
+
+    def test_from_config_with_config(self) -> None:
+        """from_config(config) respects the provided config."""
+        config = Config(disable_patterns=frozenset({"email"}))
+        formatter = RedactingJsonFormatter.from_config(config)
+        record = _make_record("Contact user@example.com")
+        output = formatter.format(record)
+        parsed = json.loads(output)
+        assert "user@example.com" in parsed["message"]
+
+    def test_from_config_with_json_indent(self) -> None:
+        """from_config() passes json_indent through."""
+        formatter = RedactingJsonFormatter.from_config(json_indent=2)
+        record = _make_record("Hello")
+        output = formatter.format(record)
+        assert "\n" in output
+        parsed = json.loads(output)
+        assert parsed["message"] == "Hello"
+
+
 class TestImportFromHushlog:
     """Verify RedactingJsonFormatter is importable from hushlog."""
 

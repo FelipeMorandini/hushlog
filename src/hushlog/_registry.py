@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 from hushlog._types import PatternEntry
+
+_NormForm = Literal["NFC", "NFD", "NFKC", "NFKD"]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -39,6 +41,18 @@ def _make_partial_validated_replacer(
     return _replacer
 
 
+def _make_partial_replacer(
+    partial_masker: Callable[[re.Match[str], str], str],
+    mask_char: str,
+) -> Callable[[re.Match[str]], str]:
+    """Create a replacement function that applies partial masking without validation."""
+
+    def _replacer(m: re.Match[str]) -> str:
+        return partial_masker(m, mask_char)
+
+    return _replacer
+
+
 class PatternRegistry:
     """Central store of pre-compiled regex patterns with heuristic pre-checks."""
 
@@ -46,6 +60,7 @@ class PatternRegistry:
         self._patterns: dict[str, PatternEntry] = {}
         self._mask_style: str = "full"
         self._mask_char: str = "*"
+        self._normalize_form: str = "NFC"
 
     def register(self, entry: PatternEntry) -> None:
         """Register a redaction pattern."""
@@ -74,7 +89,11 @@ class PatternRegistry:
 
     def _redact_full(self, text: str) -> str:
         """Full redaction: replace matches with mask labels like [EMAIL REDACTED]."""
-        text = unicodedata.normalize("NFC", text)
+        nf = self._normalize_form
+        if nf != "none":
+            nf_lit = cast("_NormForm", nf)
+            if not unicodedata.is_normalized(nf_lit, text):
+                text = unicodedata.normalize(nf_lit, text)
         for entry in self._patterns.values():
             if entry.heuristic is not None and not entry.heuristic(text):
                 continue
@@ -89,7 +108,11 @@ class PatternRegistry:
 
     def _redact_partial(self, text: str) -> str:
         """Partial redaction: preserve parts of matched values for readability."""
-        text = unicodedata.normalize("NFC", text)
+        nf = self._normalize_form
+        if nf != "none":
+            nf_lit = cast("_NormForm", nf)
+            if not unicodedata.is_normalized(nf_lit, text):
+                text = unicodedata.normalize(nf_lit, text)
         mc = self._mask_char
         for entry in self._patterns.values():
             if entry.heuristic is not None and not entry.heuristic(text):
@@ -102,7 +125,7 @@ class PatternRegistry:
                     )
                 else:
                     text = entry.regex.sub(
-                        lambda m, pm=entry.partial_masker, c=mc: pm(m, c),  # type: ignore[misc]
+                        _make_partial_replacer(entry.partial_masker, mc),
                         text,
                     )
             else:
@@ -141,6 +164,7 @@ class PatternRegistry:
         registry = cls()
         registry._mask_style = config.mask_style
         registry._mask_char = config.mask_character
+        registry._normalize_form = config.normalize_form
         # Load built-in patterns
         for entry in get_builtin_patterns():
             registry.register(entry)

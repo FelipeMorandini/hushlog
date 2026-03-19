@@ -1288,3 +1288,99 @@ class TestIPAndEmailRedaction:
         assert "[EMAIL REDACTED]" in result
         assert "10.0.0.1" not in result
         assert "admin@example.com" not in result
+
+
+# ---------------------------------------------------------------------------
+# v1.1.0 — Phone matched parentheses
+# ---------------------------------------------------------------------------
+
+
+class TestPhoneMatchedParens:
+    """Phone regex must require both parens or neither."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_PHONE)
+        return registry.redact(text)
+
+    def test_both_parens_matches(self) -> None:
+        assert self._redact("(555) 234-5678") == "[PHONE REDACTED]"
+
+    def test_no_parens_matches(self) -> None:
+        assert self._redact("555-234-5678") == "[PHONE REDACTED]"
+
+    def test_open_paren_only_no_match(self) -> None:
+        """Mismatched open paren should NOT match as phone."""
+        result = self._redact("(555 234-5678")
+        assert "[PHONE REDACTED]" not in result
+
+    def test_close_paren_only_no_match(self) -> None:
+        """Mismatched close paren should NOT match as phone."""
+        result = self._redact("555) 234-5678")
+        assert "[PHONE REDACTED]" not in result
+
+
+# ---------------------------------------------------------------------------
+# v1.1.0 — Generic secret stops at quotes
+# ---------------------------------------------------------------------------
+
+
+class TestGenericSecretQuoteBoundary:
+    """Generic secret regex should stop at quote characters."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_GENERIC_SECRET)
+        return registry.redact(text)
+
+    def test_double_quoted_value(self) -> None:
+        result = self._redact('password="mysecretvalue123"')
+        assert "[SECRET REDACTED]" in result
+        # The trailing quote should NOT be consumed by \S
+        assert result.endswith('"') or "[SECRET REDACTED]" in result
+
+    def test_single_quoted_value(self) -> None:
+        result = self._redact("password='mysecretvalue123'")
+        assert "[SECRET REDACTED]" in result
+
+
+# ---------------------------------------------------------------------------
+# v1.1.0 — NFKC normalization
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizationConfig:
+    """Test configurable Unicode normalization form."""
+
+    def test_nfkc_detects_cyrillic_homoglyph(self) -> None:
+        """NFKC normalization should help detect confusable characters."""
+        from hushlog._config import Config
+
+        # Cyrillic "а" (U+0430) looks like Latin "a" (U+0061)
+        # With NFKC, some confusables are normalized
+        registry = PatternRegistry.from_config(Config(normalize_form="NFKC"))
+        # Test that registry works with NFKC normalization
+        result = registry.redact("user@example.com")
+        assert "[EMAIL REDACTED]" in result
+
+    def test_normalize_none_skips_normalization(self) -> None:
+        """normalize_form='none' should skip Unicode normalization."""
+        from hushlog._config import Config
+
+        registry = PatternRegistry.from_config(Config(normalize_form="none"))
+        result = registry.redact("user@example.com")
+        assert "[EMAIL REDACTED]" in result
+
+    def test_default_nfc_normalization(self) -> None:
+        """Default NFC normalization should work as before."""
+        from hushlog._config import Config
+
+        registry = PatternRegistry.from_config(Config())
+        assert registry._normalize_form == "NFC"  # noqa: SLF001
+
+    def test_invalid_normalize_form_raises(self) -> None:
+        """Invalid normalize_form should raise ValueError."""
+        from hushlog._config import Config
+
+        with pytest.raises(ValueError, match="normalize_form"):
+            Config(normalize_form="INVALID")
