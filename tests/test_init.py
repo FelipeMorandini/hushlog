@@ -52,8 +52,7 @@ def test_no_unexpected_public_exports() -> None:
         "annotations",
         "logging",
         "threading",
-        "RedactingFormatter",
-        "PatternRegistry",
+        "TYPE_CHECKING",
     }
     unexpected = public_attrs - expected - allowed_extras
     assert not unexpected, f"Unexpected public names: {unexpected}"

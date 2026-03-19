@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING
 
-from hushlog._config import Config
-from hushlog._formatter import RedactingFormatter
-from hushlog._registry import PatternRegistry
+if TYPE_CHECKING:
+    from hushlog._config import Config
 
 __version__ = "0.1.0a2"
 
@@ -27,20 +27,31 @@ def patch(config: Config | None = None) -> None:
     Calling ``patch()`` multiple times is safe (idempotent) — subsequent calls
     are no-ops. To change the configuration, call ``unpatch()`` first, then
     ``patch(new_config)``.
+
+    Note: Only handlers present on the root logger at call time are wrapped.
+    Handlers added later will not be redacted.
     """
+    from hushlog._config import Config as _Config
+    from hushlog._formatter import RedactingFormatter
+    from hushlog._registry import PatternRegistry
+
     global _is_patched  # noqa: PLW0603
     with _patch_lock:
         if _is_patched:
             return None
 
-        registry = PatternRegistry.from_config(config) if config is not None else PatternRegistry()
+        resolved_config = config if config is not None else _Config()
+        registry = PatternRegistry.from_config(resolved_config)
 
+        wrapped = False
         for handler in logging.root.handlers:
             handler_id = id(handler)
             _patched_formatters[handler_id] = handler.formatter
             handler.setFormatter(RedactingFormatter(handler.formatter, registry))
+            wrapped = True
 
-        _is_patched = True
+        if wrapped:
+            _is_patched = True
     return None
 
 
@@ -59,3 +70,13 @@ def unpatch() -> None:
         _patched_formatters.clear()
         _is_patched = False
     return None
+
+
+# Re-export Config at module level for `from hushlog import Config`
+def __getattr__(name: str) -> object:
+    if name == "Config":
+        from hushlog._config import Config
+
+        return Config
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

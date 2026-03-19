@@ -129,7 +129,7 @@ class TestWithNoneBaseFormatter:
 
 
 class TestRecordNotMutated:
-    """RedactingFormatter must not mutate the original LogRecord."""
+    """RedactingFormatter must not mutate record.msg or record.args."""
 
     def test_msg_unchanged(self, populated_registry: PatternRegistry) -> None:
         """record.msg should be identical before and after format()."""

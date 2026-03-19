@@ -15,7 +15,7 @@
 
 ### 0.1.0-alpha.2: Core Engine
 - [x] `PatternRegistry` — singleton pattern store with compiled regexes and heuristic pre-checks
-- [x] `RedactingFormatter(logging.Formatter)` — intercepts `record.msg` and `record.args`
+- [x] `RedactingFormatter(logging.Formatter)` — wraps base formatter, redacts final output string
 - [x] `hushlog.patch()` — zero-config entry point, wraps root logger formatters
 - [x] `hushlog.unpatch()` — clean teardown for testing and runtime toggling
 
