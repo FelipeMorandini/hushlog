@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress as _ipaddress
 import re
 
 from hushlog._types import PatternEntry
@@ -22,6 +23,31 @@ def _luhn_check(text: str) -> bool:
                 d -= 9
         checksum += d
     return checksum % 10 == 0
+
+
+def _ipv4_validate(text: str) -> bool:
+    """Validate an IPv4 address: each octet must be 0-255 with no leading zeros."""
+    parts = text.split(".")
+    if len(parts) != 4:
+        return False
+    for part in parts:
+        if not part or not all(c in _ASCII_DIGITS for c in part):
+            return False
+        if len(part) > 1 and part[0] == "0":
+            return False  # Reject leading zeros (e.g., 01, 001)
+        val = int(part)
+        if val > 255:
+            return False
+    return True
+
+
+def _ipv6_validate(text: str) -> bool:
+    """Validate an IPv6 address using the standard library."""
+    try:
+        _ipaddress.IPv6Address(text)
+        return True
+    except ValueError:
+        return False
 
 
 # --- Credit Card ---
@@ -193,6 +219,69 @@ _GCP_KEY = PatternEntry(
 )
 
 
+# --- IPv4 ---
+# Matches IPv4 addresses (0-255 per octet). Validator rejects invalid octets
+# and leading zeros. Lookbehind rejects version-like contexts (v1.2.3.4, pkg@1.2.3.4).
+_IPV4_RE = re.compile(
+    r"(?<![0-9a-zA-Z.@])"  # Not preceded by alphanumeric, dot, or @
+    r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+    r"(?![0-9.])"  # Not followed by digit or dot
+)
+
+_IPV4 = PatternEntry(
+    name="ipv4",
+    regex=_IPV4_RE,
+    heuristic=None,
+    mask="[IPV4 REDACTED]",
+    validator=_ipv4_validate,
+)
+
+
+# --- IPv6 ---
+# Matches IPv6 addresses (full, compressed, and mixed IPv4-mapped forms).
+# The regex is a loose pre-filter; the validator uses ipaddress.IPv6Address for correctness.
+_IPV6_RE = re.compile(
+    r"(?<![0-9a-zA-Z:.])"
+    r"(?:"
+    # Full form: 8 groups of 1-4 hex digits
+    r"[0-9a-fA-F]{1,4}(?::[0-9a-fA-F]{1,4}){7}"
+    r"|"
+    # Compressed forms with ::
+    r"(?:[0-9a-fA-F]{1,4}:){1,7}:"
+    r"|"
+    r"(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}"
+    r"|"
+    r"(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}"
+    r"|"
+    r"(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}"
+    r"|"
+    r"(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}"
+    r"|"
+    r"(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}"
+    r"|"
+    r"[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}"
+    r"|"
+    # :: with suffix
+    r":(?::[0-9a-fA-F]{1,4}){1,7}"
+    r"|"
+    # IPv4-mapped: ::ffff:192.168.1.1
+    r"::(?:ffff:)?[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+    r"|"
+    # Just ::
+    r"::"
+    r")"
+    r"(?![0-9a-zA-Z:.])"
+)
+
+_IPV6 = PatternEntry(
+    name="ipv6",
+    regex=_IPV6_RE,
+    heuristic=lambda text: ":" in text,
+    mask="[IPV6 REDACTED]",
+    validator=_ipv6_validate,
+)
+
+
 # --- Generic Secret ---
 # Context-dependent: matches values after common secret-related labels.
 # Replaces the entire match (label + value) to avoid leaking context.
@@ -236,6 +325,7 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
 
     Order rationale:
     - Specific patterns with fixed prefixes (credit_card, ssn, API keys) first
+    - IPv6 before IPv4 to catch ::ffff:x.x.x.x mapped addresses first
     - Context-dependent patterns (generic_secret) before general patterns (email)
       because email redaction inserts spaces that break generic_secret's ``\\S{8,128}``
     - Broadest patterns (email, phone) last to avoid consuming text needed by
@@ -250,6 +340,8 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
         _STRIPE_KEY,
         _GITHUB_TOKEN,
         _GCP_KEY,
+        _IPV6,
+        _IPV4,
         _GENERIC_SECRET,
         _EMAIL,
         _PHONE,

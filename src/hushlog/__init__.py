@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hushlog._config import Config
 
-__version__ = "0.2.0a1"
+__version__ = "0.2.0a2"
 
 __all__ = ["Config", "patch", "unpatch"]
 
