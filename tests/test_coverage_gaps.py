@@ -382,11 +382,24 @@ class TestPartialRedactLambdaFallback:
 
 
 class TestUnicodeNormalization:
-    """Verify NFC normalization prevents homograph bypasses."""
+    """Verify NFC normalization prevents decomposed-form bypasses."""
 
     def test_nfc_normalization_email(self) -> None:
-        """Email with decomposed Unicode is normalized before redaction."""
+        """ASCII email is redacted normally (baseline)."""
         registry = PatternRegistry.from_config(Config())
-        # Use a normal ASCII email but verify normalization doesn't break it
         result = registry.redact("user@example.com")
         assert "[EMAIL REDACTED]" in result
+
+    def test_nfc_decomposed_email(self) -> None:
+        """Email with NFD-decomposed characters is normalized before matching."""
+        import unicodedata
+
+        registry = PatternRegistry.from_config(Config())
+        # "ü" can be composed (U+00FC) or decomposed (U+0075 + U+0308)
+        composed = "us\u00fcr@example.com"  # üser
+        decomposed = unicodedata.normalize("NFD", composed)
+        assert composed != decomposed  # They differ in byte representation
+        # Both should produce the same redaction result after NFC
+        result_composed = registry.redact(f"email: {composed}")
+        result_decomposed = registry.redact(f"email: {decomposed}")
+        assert result_composed == result_decomposed
