@@ -1031,5 +1031,5 @@ class TestMixedAPIKeysAndPII:
         result = self._redact_all(text)
         assert "[STRIPE_KEY REDACTED]" in result
         assert "[SSN REDACTED]" in result
-        assert "sk_live_" not in result
+        assert "sk_test_" not in result
         assert "123-45-6789" not in result
