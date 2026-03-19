@@ -9,6 +9,9 @@ import pytest
 from hushlog._patterns import (
     _AWS_ACCESS_KEY,
     _AWS_SECRET_KEY,
+    _BR_PHONE,
+    _CNPJ,
+    _CPF,
     _CREDIT_CARD,
     _EMAIL,
     _GCP_KEY,
@@ -20,6 +23,8 @@ from hushlog._patterns import (
     _PHONE,
     _SSN,
     _STRIPE_KEY,
+    _cnpj_validate,
+    _cpf_validate,
     _ipv4_validate,
     _ipv6_validate,
     _luhn_check,
@@ -41,7 +46,7 @@ class TestGetBuiltinPatterns:
         assert isinstance(result, tuple)
 
     def test_count(self) -> None:
-        assert len(get_builtin_patterns()) == 13
+        assert len(get_builtin_patterns()) == 16
 
     def test_all_are_pattern_entries(self) -> None:
         for entry in get_builtin_patterns():
@@ -61,6 +66,9 @@ class TestGetBuiltinPatterns:
             "gcp_key",
             "ipv6",
             "ipv4",
+            "cpf",
+            "cnpj",
+            "br_phone",
             "generic_secret",
             "email",
             "phone",
@@ -1382,3 +1390,240 @@ class TestNormalizationConfig:
 
         with pytest.raises(ValueError, match="normalize_form"):
             Config(normalize_form="INVALID")
+
+
+# ---------------------------------------------------------------------------
+# CPF validator
+# ---------------------------------------------------------------------------
+
+
+class TestCPFValidator:
+    """Validate the CPF check digit algorithm implementation."""
+
+    @pytest.mark.parametrize(
+        "cpf",
+        [
+            "529.982.247-25",
+            "453.178.287-91",
+            "017.433.460-50",
+            "111.444.777-35",
+        ],
+    )
+    def test_valid_cpfs(self, cpf: str) -> None:
+        assert _cpf_validate(cpf) is True
+
+    @pytest.mark.parametrize(
+        "cpf",
+        [
+            "529.982.247-26",  # Wrong check digit
+            "000.000.000-00",  # All same digits
+            "111.111.111-11",  # All same digits
+            "123.456.789-0",  # Too short
+        ],
+    )
+    def test_invalid_cpfs(self, cpf: str) -> None:
+        assert _cpf_validate(cpf) is False
+
+    def test_all_same_digits_rejected(self) -> None:
+        """All-same-digit CPFs like 111.111.111-11 must be rejected."""
+        for d in range(10):
+            cpf = f"{d}{d}{d}.{d}{d}{d}.{d}{d}{d}-{d}{d}"
+            assert _cpf_validate(cpf) is False
+
+
+# ---------------------------------------------------------------------------
+# CPF pattern
+# ---------------------------------------------------------------------------
+
+
+class TestCPFPattern:
+    """Test CPF regex + validator integration."""
+
+    def test_valid_cpf_redacted(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_CPF)
+        result = registry.redact("CPF: 529.982.247-25")
+        assert "[CPF REDACTED]" in result
+        assert "529.982.247-25" not in result
+
+    def test_invalid_check_digit_not_redacted(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_CPF)
+        result = registry.redact("CPF: 529.982.247-26")
+        assert "529.982.247-26" in result
+        assert "[CPF REDACTED]" not in result
+
+    def test_all_same_digits_not_redacted(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_CPF)
+        result = registry.redact("CPF: 111.111.111-11")
+        assert "111.111.111-11" in result
+        assert "[CPF REDACTED]" not in result
+
+    def test_bare_digits_not_matched(self) -> None:
+        """Bare 11-digit CPF (no formatting) should NOT be matched."""
+        registry = PatternRegistry()
+        registry.register(_CPF)
+        result = registry.redact("CPF: 52998224725")
+        assert "52998224725" in result
+        assert "[CPF REDACTED]" not in result
+
+    def test_multiple_cpfs(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_CPF)
+        result = registry.redact("CPFs: 529.982.247-25 and 453.178.287-91")
+        assert result.count("[CPF REDACTED]") == 2
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("CPF: 529.982.247-25")
+        assert "***.***.***-25" in result
+
+    def test_heuristic_skips_without_dot_and_dash(self) -> None:
+        """Heuristic requires both '.' and '-' in the text."""
+        assert _CPF.heuristic is not None
+        assert _CPF.heuristic("no special chars here") is False
+        assert _CPF.heuristic("has.dot but no dash") is False
+        assert _CPF.heuristic("has-dash but no dot") is False
+        assert _CPF.heuristic("has.both-chars") is True
+
+
+# ---------------------------------------------------------------------------
+# CNPJ validator
+# ---------------------------------------------------------------------------
+
+
+class TestCNPJValidator:
+    """Validate the CNPJ check digit algorithm implementation."""
+
+    @pytest.mark.parametrize(
+        "cnpj",
+        [
+            "11.222.333/0001-81",
+            "11.444.777/0001-61",
+            "53.113.791/0001-22",
+        ],
+    )
+    def test_valid_cnpjs(self, cnpj: str) -> None:
+        assert _cnpj_validate(cnpj) is True
+
+    @pytest.mark.parametrize(
+        "cnpj",
+        [
+            "11.222.333/0001-82",  # Wrong check digit
+            "00.000.000/0000-00",  # All same digits
+            "11.111.111/1111-11",  # All same digits
+        ],
+    )
+    def test_invalid_cnpjs(self, cnpj: str) -> None:
+        assert _cnpj_validate(cnpj) is False
+
+
+# ---------------------------------------------------------------------------
+# CNPJ pattern
+# ---------------------------------------------------------------------------
+
+
+class TestCNPJPattern:
+    """Test CNPJ regex + validator integration."""
+
+    def test_valid_cnpj_redacted(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_CNPJ)
+        result = registry.redact("CNPJ: 11.222.333/0001-81")
+        assert "[CNPJ REDACTED]" in result
+        assert "11.222.333/0001-81" not in result
+
+    def test_invalid_check_digit_not_redacted(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_CNPJ)
+        result = registry.redact("CNPJ: 11.222.333/0001-82")
+        assert "11.222.333/0001-82" in result
+        assert "[CNPJ REDACTED]" not in result
+
+    def test_bare_digits_not_matched(self) -> None:
+        """Bare 14-digit CNPJ (no formatting) should NOT be matched."""
+        registry = PatternRegistry()
+        registry.register(_CNPJ)
+        result = registry.redact("CNPJ: 11222333000181")
+        assert "11222333000181" in result
+        assert "[CNPJ REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("CNPJ: 11.222.333/0001-81")
+        assert "**.***.***/0001-81" in result
+
+    def test_heuristic_skips_without_slash(self) -> None:
+        """Heuristic requires '/' in the text."""
+        assert _CNPJ.heuristic is not None
+        assert _CNPJ.heuristic("no slash here") is False
+        assert _CNPJ.heuristic("has/slash") is True
+
+
+# ---------------------------------------------------------------------------
+# BR Phone pattern
+# ---------------------------------------------------------------------------
+
+
+class TestBRPhonePattern:
+    """Test Brazilian phone number pattern."""
+
+    def test_mobile_with_country_code(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_BR_PHONE)
+        result = registry.redact("Phone: +55 (11) 91234-5678")
+        assert "[BR_PHONE REDACTED]" in result
+        assert "91234-5678" not in result
+
+    def test_mobile_without_country_code(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_BR_PHONE)
+        result = registry.redact("Phone: (11) 91234-5678")
+        assert "[BR_PHONE REDACTED]" in result
+
+    def test_landline(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_BR_PHONE)
+        result = registry.redact("Phone: (21) 2345-6789")
+        assert "[BR_PHONE REDACTED]" in result
+
+    def test_without_parens_not_matched(self) -> None:
+        """Phone without parenthesized area code should NOT be matched."""
+        registry = PatternRegistry()
+        registry.register(_BR_PHONE)
+        result = registry.redact("Phone: 11 91234-5678")
+        assert "[BR_PHONE REDACTED]" not in result
+
+    def test_invalid_area_code_not_matched(self) -> None:
+        """Area code starting with 0 should NOT be matched."""
+        registry = PatternRegistry()
+        registry.register(_BR_PHONE)
+        result = registry.redact("Phone: (01) 91234-5678")
+        assert "[BR_PHONE REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("Phone: (11) 91234-5678")
+        assert "(**) *****-5678" in result
+
+    def test_landline_with_country_code(self) -> None:
+        registry = PatternRegistry()
+        registry.register(_BR_PHONE)
+        result = registry.redact("Phone: +55(21) 2345-6789")
+        assert "[BR_PHONE REDACTED]" in result
+
+    def test_heuristic_skips_without_paren(self) -> None:
+        """Heuristic requires '(' in the text."""
+        assert _BR_PHONE.heuristic is not None
+        assert _BR_PHONE.heuristic("no parens here") is False
+        assert _BR_PHONE.heuristic("has (paren)") is True

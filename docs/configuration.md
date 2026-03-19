@@ -50,6 +50,9 @@ A frozenset of built-in pattern names to skip. Available names:
 | `gcp_key` | GCP API keys |
 | `ipv4` | IPv4 addresses |
 | `ipv6` | IPv6 addresses |
+| `cpf` | Brazilian CPF numbers (check digit validated) |
+| `cnpj` | Brazilian CNPJ numbers (check digit validated) |
+| `br_phone` | Brazilian phone numbers |
 | `generic_secret` | Generic secrets (label-based) |
 
 ### `mask_style`

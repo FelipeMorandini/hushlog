@@ -159,9 +159,9 @@
 ### Region Packs (optional extras)
 
 **Brazil (`hushlog[br]`):**
-- [ ] CPF (`XXX.XXX.XXX-XX` with check digit validation)
-- [ ] CNPJ (`XX.XXX.XXX/XXXX-XX`)
-- [ ] Brazilian phone numbers (+55 formats, 10-11 digits)
+- [x] CPF (`XXX.XXX.XXX-XX` with check digit validation)
+- [x] CNPJ (`XX.XXX.XXX/XXXX-XX`)
+- [x] Brazilian phone numbers (+55 formats, 10-11 digits)
 - [ ] RG (regional ID, variable format)
 
 **European Union (`hushlog[eu]`):**

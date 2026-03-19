@@ -70,6 +70,9 @@ HushLog wraps your existing logging formatters with a `RedactingFormatter` that 
 | Generic Secret | `password=MyS3cret` | `[SECRET REDACTED]` | Label-based (password, secret, api_key, etc.) |
 | IPv4 | `192.168.1.1` | `[IPV4 REDACTED]` | Octet-validated, rejects version strings |
 | IPv6 | `2001:db8::8a2e:370:7334` | `[IPV6 REDACTED]` | Full, compressed, and mixed forms |
+| CPF | `529.982.247-25` | `[CPF REDACTED]` | Brazilian individual taxpayer ID, check digit validated |
+| CNPJ | `11.222.333/0001-81` | `[CNPJ REDACTED]` | Brazilian company taxpayer ID, check digit validated |
+| BR Phone | `(11) 91234-5678` | `[BR_PHONE REDACTED]` | Brazilian mobile/landline, optional +55 prefix |
 
 ## Configuration
 
