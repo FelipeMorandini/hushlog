@@ -31,11 +31,12 @@ class TestPackageStructure:
 
     def test_version_matches_pep440(self) -> None:
         """Version string is present and looks like a PEP 440 version."""
-        assert hushlog.__version__ == "0.2.0"
+        assert hushlog.__version__ == "0.3.0a1"
 
     def test_all_exports(self) -> None:
         """__all__ lists exactly the public API surface."""
-        assert set(hushlog.__all__) == {"patch", "unpatch", "Config"}
+        expected = {"patch", "unpatch", "Config", "RedactingJsonFormatter", "redact_dict"}
+        assert set(hushlog.__all__) == expected
 
     def test_py_typed_marker_exists(self) -> None:
         """py.typed marker file exists for PEP 561 compliance."""

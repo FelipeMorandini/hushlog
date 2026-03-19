@@ -105,6 +105,51 @@ hushlog.patch(Config(mask_style="partial", mask_character="#"))
 
 > **Note:** Partial masking reveals partial information (first/last characters). In small organizations, this may be identifying. Use `mask_style="full"` (default) for maximum privacy.
 
+## JSON / Structured Logging
+
+HushLog supports JSON log output with automatic PII redaction in all string values, including nested structures.
+
+### RedactingJsonFormatter
+
+Use `RedactingJsonFormatter` as a drop-in JSON formatter for any handler:
+
+```python
+import logging
+from hushlog import Config, RedactingJsonFormatter
+from hushlog._registry import PatternRegistry  # internal API
+
+registry = PatternRegistry.from_config(Config())
+formatter = RedactingJsonFormatter(registry)
+
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+logging.getLogger().addHandler(handler)
+
+logger = logging.getLogger(__name__)
+logger.info("Contact user@example.com", extra={"ssn": "078-05-1120"})
+# Output: {"message": "Contact [EMAIL REDACTED]", "ssn": "[SSN REDACTED]", ...}
+```
+
+Works with or without [`python-json-logger`](https://pypi.org/project/python-json-logger/) installed. Install the optional dependency for enhanced JSON serialization:
+
+```bash
+pip install hushlog[json]
+```
+
+### redact_dict()
+
+For manual redaction of dict/list/string structures:
+
+```python
+import hushlog
+
+data = {"user": {"email": "alice@corp.io", "name": "Alice", "age": 30}}
+clean = hushlog.redact_dict(data)
+# {"user": {"email": "[EMAIL REDACTED]", "name": "Alice", "age": 30}}
+```
+
+> **Note:** `redact_dict()` creates a new `PatternRegistry` on every call. For repeated use, create a registry once via `PatternRegistry.from_config()` and call `registry.redact_dict()` directly.
+
 ## Teardown
 
 Call `unpatch()` to remove HushLog's formatter wrappers and restore the original formatters. This is useful for testing or runtime toggling:
@@ -119,7 +164,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 - Only handlers present on the **root logger** at `patch()` time are wrapped. Handlers added later will not be redacted.
 - Named loggers with `propagate=False` and their own handlers bypass root-level redaction.
-- No structured log support yet (structlog/loguru integrations planned for v0.3.0).
+- structlog/loguru integrations planned for v0.3.0.
 - Phone detection is US NANP only.
 
 ## Planned

@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hushlog._config import Config
 
-__version__ = "0.2.0"
+__version__ = "0.3.0a1"
 
-__all__ = ["Config", "patch", "unpatch"]
+__all__ = ["Config", "RedactingJsonFormatter", "patch", "redact_dict", "unpatch"]
 
 _patched_formatters: dict[int, logging.Formatter | None] = {}
 _is_patched: bool = False
@@ -72,11 +72,34 @@ def unpatch() -> None:
     return None
 
 
-# Re-export Config at module level for `from hushlog import Config`
+def redact_dict(data: object, config: Config | None = None) -> object:
+    """Redact PII in a dict/list/string structure.
+
+    Convenience wrapper around ``PatternRegistry.redact_dict()``.
+
+    .. note::
+
+        This creates a new ``PatternRegistry`` on every call. For repeated use,
+        create a registry once via ``PatternRegistry.from_config()`` and call
+        ``registry.redact_dict()`` directly.
+    """
+    from hushlog._config import Config as _Config
+    from hushlog._registry import PatternRegistry
+
+    resolved_config = config if config is not None else _Config()
+    registry = PatternRegistry.from_config(resolved_config)
+    return registry.redact_dict(data)
+
+
+# Lazy imports for public API symbols
 def __getattr__(name: str) -> object:
     if name == "Config":
         from hushlog._config import Config
 
         return Config
+    if name == "RedactingJsonFormatter":
+        from hushlog._json_formatter import RedactingJsonFormatter
+
+        return RedactingJsonFormatter
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)

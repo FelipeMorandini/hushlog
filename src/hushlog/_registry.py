@@ -107,6 +107,23 @@ class PatternRegistry:
                     text = entry.regex.sub(entry.mask, text)
         return text
 
+    def redact_dict(self, data: object, *, _depth: int = 0) -> object:
+        """Recursively redact string values in dicts, lists, and tuples.
+
+        Non-string scalars (int, float, bool, None) are returned as-is.
+        Keys in dicts are not redacted — only values.
+        Max recursion depth of 20 prevents stack overflow on pathological input.
+        """
+        if _depth > 20:
+            return data
+        if isinstance(data, str):
+            return self.redact(data)
+        if isinstance(data, dict):
+            return {k: self.redact_dict(v, _depth=_depth + 1) for k, v in data.items()}
+        if isinstance(data, (list, tuple)):
+            return [self.redact_dict(item, _depth=_depth + 1) for item in data]
+        return data
+
     @classmethod
     def from_config(cls, config: Config) -> PatternRegistry:
         """Build a registry from a Config, applying disable/custom pattern overrides."""
