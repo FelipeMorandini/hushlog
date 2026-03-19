@@ -5,13 +5,13 @@
 ## v0.1.0 — MVP (Foundation)
 
 ### 0.1.0-alpha.1: Project Scaffolding
-- [ ] Python package structure (`src/hushlog/`)
-- [ ] `pyproject.toml` with build system, dependencies, and dev extras
-- [ ] Development tooling: ruff, mypy, pytest, pre-commit
-- [ ] GitHub Actions: CI pipeline (lint, type-check, test on Python 3.10–3.13)
-- [ ] GitHub Actions: Automated release pipeline (on tag push → build → publish to PyPI)
-- [ ] `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`
-- [ ] Basic `README.md` with installation and quickstart
+- [x] Python package structure (`src/hushlog/`)
+- [x] `pyproject.toml` with build system, dependencies, and dev extras
+- [x] Development tooling: ruff, mypy, pytest, pre-commit
+- [x] GitHub Actions: CI pipeline (lint, type-check, test on Python 3.10–3.13)
+- [x] GitHub Actions: Automated release pipeline (on tag push → build → publish to PyPI)
+- [x] `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`
+- [x] Basic `README.md` with installation and quickstart
 
 ### 0.1.0-alpha.2: Core Engine
 - [x] `PatternRegistry` — singleton pattern store with compiled regexes and heuristic pre-checks
@@ -101,8 +101,17 @@
 - [ ] 100% test coverage
 - [ ] Fuzz testing for regex patterns (ReDoS detection)
 - [ ] Thread-safety verification under concurrent logging
+- [ ] ReDoS validation for custom patterns (reject or warn on catastrophic backtracking)
+- [ ] Unicode normalization (NFC) before redaction to prevent homograph bypasses
 
-### 1.0.0-rc.2: Documentation & Community
+### 1.0.0-rc.2: Hardening
+- [ ] Track patched handlers via `weakref.WeakKeyDictionary` instead of `id()` to handle handler removal
+- [ ] Protect `record.exc_text` from leaking unredacted exception text (format a shallow copy or restore after)
+- [ ] Validate mask strings at registration time (reject invalid backreferences)
+- [ ] Make `Config.custom_patterns` truly immutable (`MappingProxyType` or defensive copy)
+- [ ] Document heuristic security model (trusted code only, not user-supplied)
+
+### 1.0.0-rc.3: Documentation & Community
 - [ ] MkDocs or ReadTheDocs site
 - [ ] API reference (auto-generated from docstrings)
 - [ ] Contribution guide with pattern submission template
