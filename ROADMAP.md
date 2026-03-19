@@ -87,9 +87,9 @@
 - [x] Integration test with loguru
 
 ### 0.3.0: Release
-- [ ] Cross-framework integration tests
-- [ ] Updated docs with framework-specific guides
-- [ ] Tag and release v0.3.0
+- [x] Cross-framework integration tests
+- [x] Updated docs with framework-specific guides
+- [x] Tag and release v0.3.0
 
 ---
 

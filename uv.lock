@@ -170,7 +170,7 @@ wheels = [
 
 [[package]]
 name = "hushlog"
-version = "0.3.0a3"
+version = "0.3.0"
 source = { editable = "." }
 
 [package.optional-dependencies]
