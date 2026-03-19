@@ -65,9 +65,9 @@
 - [x] Pattern validation on config load (catch invalid regex early)
 
 ### 0.2.0: Release
-- [ ] Full test coverage for all new patterns and masking modes
-- [ ] Updated docs and examples
-- [ ] Tag and release v0.2.0
+- [x] Full test coverage for all new patterns and masking modes
+- [x] Updated docs and examples
+- [x] Tag and release v0.2.0
 
 ---
 
