@@ -20,10 +20,10 @@
 - [x] `hushlog.unpatch()` — clean teardown for testing and runtime toggling
 
 ### 0.1.0-alpha.3: Basic PII Patterns
-- [ ] Email addresses (RFC 5322 subset with `@` heuristic pre-check)
-- [ ] Credit card numbers (Visa, MasterCard, Amex, Discover with Luhn validation)
-- [ ] Social Security Numbers (XXX-XX-XXXX format)
-- [ ] US phone numbers (multiple formats: parenthesized area code, dashes, dots, spaces)
+- [x] Email addresses (RFC 5322 subset with `@` heuristic pre-check)
+- [x] Credit card numbers (Visa, MasterCard, Amex, Discover with Luhn validation)
+- [x] Social Security Numbers (XXX-XX-XXXX format)
+- [x] US phone numbers (multiple formats: parenthesized area code, dashes, dots, spaces)
 
 ### 0.1.0-rc.1: MVP Polish
 - [ ] End-to-end integration tests through Python logging pipeline

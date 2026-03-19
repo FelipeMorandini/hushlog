@@ -8,6 +8,7 @@ package structure is well-formed.
 from __future__ import annotations
 
 import importlib
+import io
 import logging
 import pathlib
 from typing import TYPE_CHECKING
@@ -30,7 +31,7 @@ class TestPackageStructure:
 
     def test_version_matches_pep440(self) -> None:
         """Version string is present and looks like a PEP 440 version."""
-        assert hushlog.__version__ == "0.1.0a2"
+        assert hushlog.__version__ == "0.1.0a3"
 
     def test_all_exports(self) -> None:
         """__all__ lists exactly the public API surface."""
@@ -428,3 +429,208 @@ class TestExceptionLogging:
         finally:
             hushlog.unpatch()
             root.removeHandler(handler)
+
+
+class TestPIIRedactionThroughPipeline:
+    """Verify PII redaction flows through the actual logging pipeline with real handler output."""
+
+    @staticmethod
+    def _make_handler() -> tuple[logging.StreamHandler, io.StringIO]:
+        """Create a StreamHandler backed by a StringIO buffer."""
+        buf = io.StringIO()
+        handler = logging.StreamHandler(buf)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        return handler, buf
+
+    def test_zero_config_email_redaction(self) -> None:
+        """patch() with no config redacts an email in handler output."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            hushlog.patch()
+            logger = logging.getLogger("hushlog.test.pii.email")
+            logger.info("Contact user@example.com for details")
+            handler.flush()
+            output = buf.getvalue()
+            assert "[EMAIL REDACTED]" in output
+            assert "user@example.com" not in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_multi_pii_redaction(self) -> None:
+        """A single log message with email, SSN, and phone is fully redacted."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            hushlog.patch()
+            logger = logging.getLogger("hushlog.test.pii.multi")
+            logger.info("User alice@corp.io SSN 078-05-1120 phone (212) 555-1234")
+            handler.flush()
+            output = buf.getvalue()
+            assert "[EMAIL REDACTED]" in output
+            assert "alice@corp.io" not in output
+            assert "[SSN REDACTED]" in output
+            assert "078-05-1120" not in output
+            assert "[PHONE REDACTED]" in output
+            assert "(212) 555-1234" not in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_credit_card_luhn_valid_redacted(self) -> None:
+        """A valid credit card number (passes Luhn) is redacted through the pipeline."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            hushlog.patch()
+            logger = logging.getLogger("hushlog.test.pii.cc_valid")
+            # 4111111111111111 is a well-known Visa test number that passes Luhn
+            logger.info("Card: 4111111111111111")
+            handler.flush()
+            output = buf.getvalue()
+            assert "[CREDIT_CARD REDACTED]" in output
+            assert "4111111111111111" not in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_credit_card_luhn_invalid_not_redacted(self) -> None:
+        """An invalid credit card number (fails Luhn) is NOT redacted."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            hushlog.patch()
+            logger = logging.getLogger("hushlog.test.pii.cc_invalid")
+            # 4111111111111112 fails the Luhn check
+            logger.info("Card: 4111111111111112")
+            handler.flush()
+            output = buf.getvalue()
+            assert "[CREDIT_CARD REDACTED]" not in output
+            assert "4111111111111112" in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_disable_patterns_skips_email(self) -> None:
+        """disable_patterns={'email'} leaves emails unredacted but still redacts SSN."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            config = Config(disable_patterns=frozenset({"email"}))
+            hushlog.patch(config=config)
+            logger = logging.getLogger("hushlog.test.pii.disable")
+            logger.info("Email: bob@test.org SSN: 078-05-1120")
+            handler.flush()
+            output = buf.getvalue()
+            # Email should NOT be redacted because the pattern is disabled
+            assert "bob@test.org" in output
+            assert "[EMAIL REDACTED]" not in output
+            # SSN should still be redacted
+            assert "[SSN REDACTED]" in output
+            assert "078-05-1120" not in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_custom_pattern_overrides_builtin(self) -> None:
+        """A custom 'email' pattern replaces the builtin email regex."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            # Custom pattern only matches exactly "custom@pattern"
+            config = Config(custom_patterns={"email": r"custom@pattern"})
+            hushlog.patch(config=config)
+            logger = logging.getLogger("hushlog.test.pii.custom_override")
+
+            # The custom pattern should match "custom@pattern"
+            logger.info("Contact custom@pattern now")
+            handler.flush()
+            output = buf.getvalue()
+            assert "custom@pattern" not in output
+            assert "[EMAIL REDACTED]" in output
+
+            # Clear the buffer and test that normal emails are NOT matched
+            buf.truncate(0)
+            buf.seek(0)
+            logger.info("Contact user@example.com now")
+            handler.flush()
+            output = buf.getvalue()
+            # The builtin email regex is overridden, so standard email should NOT be redacted
+            assert "user@example.com" in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_percent_style_formatting_with_pii(self) -> None:
+        """%-style formatting (logger.info('...%s', arg)) redacts PII in the formatted output."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            hushlog.patch()
+            logger = logging.getLogger("hushlog.test.pii.percent")
+            logger.info("User SSN: %s", "078-05-1120")
+            handler.flush()
+            output = buf.getvalue()
+            assert "[SSN REDACTED]" in output
+            assert "078-05-1120" not in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)
+
+    def test_fstring_with_credit_card(self) -> None:
+        """An f-string containing a credit card number is redacted in the output."""
+        root = logging.getLogger()
+        handler, buf = self._make_handler()
+        root.addHandler(handler)
+        original_level = root.level
+        root.setLevel(logging.DEBUG)
+
+        try:
+            hushlog.patch()
+            logger = logging.getLogger("hushlog.test.pii.fstring")
+            card_number = "4111111111111111"
+            logger.info(f"Card: {card_number}")
+            handler.flush()
+            output = buf.getvalue()
+            assert "[CREDIT_CARD REDACTED]" in output
+            assert "4111111111111111" not in output
+        finally:
+            hushlog.unpatch()
+            root.removeHandler(handler)
+            root.setLevel(original_level)

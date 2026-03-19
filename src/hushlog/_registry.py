@@ -8,7 +8,21 @@ from typing import TYPE_CHECKING
 from hushlog._types import PatternEntry
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from hushlog._config import Config
+
+
+def _make_validated_replacer(
+    validator: Callable[[str], bool],
+    mask: str,
+) -> Callable[[re.Match[str]], str]:
+    """Create a replacement function that applies a validator before masking."""
+
+    def _replacer(m: re.Match[str]) -> str:
+        return mask if validator(m.group()) else m.group()
+
+    return _replacer
 
 
 class PatternRegistry:
@@ -35,19 +49,29 @@ class PatternRegistry:
         for entry in self._patterns.values():
             if entry.heuristic is not None and not entry.heuristic(text):
                 continue
-            text = entry.regex.sub(entry.mask, text)
+            if entry.validator is not None:
+                text = entry.regex.sub(
+                    _make_validated_replacer(entry.validator, entry.mask),
+                    text,
+                )
+            else:
+                text = entry.regex.sub(entry.mask, text)
         return text
 
     @classmethod
     def from_config(cls, config: Config) -> PatternRegistry:
         """Build a registry from a Config, applying disable/custom pattern overrides."""
+        from hushlog._patterns import get_builtin_patterns
+
         registry = cls()
-        # Start with built-in patterns (none for alpha.2, will be populated in alpha.3)
+        # Load built-in patterns
+        for entry in get_builtin_patterns():
+            registry.register(entry)
         # Remove disabled patterns
         for name in config.disable_patterns:
             if name in registry._patterns:
                 registry.unregister(name)
-        # Add custom patterns
+        # Add custom patterns (override builtins if same name)
         for name, pattern_str in config.custom_patterns.items():
             entry = PatternEntry(
                 name=name,
