@@ -39,6 +39,7 @@ def test_all_exports_are_complete() -> None:
         "unpatch",
         "Config",
         "RedactingJsonFormatter",
+        "loguru_sink",
         "redact_dict",
         "structlog_processor",
     }
@@ -58,6 +59,7 @@ def test_no_unexpected_public_exports() -> None:
         "unpatch",
         "Config",
         "RedactingJsonFormatter",
+        "loguru_sink",
         "redact_dict",
         "structlog_processor",
     }

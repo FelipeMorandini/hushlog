@@ -83,8 +83,8 @@
 - [x] Integration test with structlog pipeline
 
 ### 0.3.0-alpha.3: loguru Support
-- [ ] `hushlog.loguru_patcher()` — a loguru patcher/sink wrapper
-- [ ] Integration test with loguru
+- [x] `hushlog.loguru_sink()` — a loguru sink wrapper for PII redaction
+- [x] Integration test with loguru
 
 ### 0.3.0: Release
 - [ ] Cross-framework integration tests

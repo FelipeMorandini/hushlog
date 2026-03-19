@@ -31,7 +31,7 @@ class TestPackageStructure:
 
     def test_version_matches_pep440(self) -> None:
         """Version string is present and looks like a PEP 440 version."""
-        assert hushlog.__version__ == "0.3.0a2"
+        assert hushlog.__version__ == "0.3.0a3"
 
     def test_all_exports(self) -> None:
         """__all__ lists exactly the public API surface."""
@@ -40,6 +40,7 @@ class TestPackageStructure:
             "unpatch",
             "Config",
             "RedactingJsonFormatter",
+            "loguru_sink",
             "redact_dict",
             "structlog_processor",
         }

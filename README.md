@@ -173,6 +173,23 @@ logger.info("login", email="alice@corp.com")
 
 Install the optional dependency: `pip install hushlog[structlog]`
 
+### loguru
+
+Wrap any loguru sink with PII redaction:
+
+```python
+from loguru import logger
+from hushlog import loguru_sink
+
+logger.remove()  # Remove default sink
+logger.add(loguru_sink(print), format="{message}")
+
+logger.info("User alice@corp.com logged in")
+# Output: User [EMAIL REDACTED] logged in
+```
+
+Install the optional dependency: `pip install hushlog[loguru]`
+
 ## Teardown
 
 Call `unpatch()` to remove HushLog's formatter wrappers and restore the original formatters. This is useful for testing or runtime toggling:
@@ -192,7 +209,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 
 ## Planned
 
-Loguru integration, and more. See the [roadmap](ROADMAP.md) for details.
+Production hardening, docs site, and more. See the [roadmap](ROADMAP.md) for details.
 
 ## Contributing
 

@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from hushlog._config import Config
 
-__version__ = "0.3.0a2"
+__version__ = "0.3.0a3"
 
 __all__ = [
     "Config",
     "RedactingJsonFormatter",
+    "loguru_sink",
     "patch",
     "redact_dict",
     "structlog_processor",
@@ -112,5 +113,9 @@ def __getattr__(name: str) -> object:
         from hushlog._structlog import structlog_processor
 
         return structlog_processor
+    if name == "loguru_sink":
+        from hushlog._loguru import loguru_sink
+
+        return loguru_sink
     msg = f"module {__name__!r} has no attribute {name!r}"
     raise AttributeError(msg)
