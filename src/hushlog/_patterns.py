@@ -84,6 +84,50 @@ def _cnpj_validate(text: str) -> bool:
     return digits[13] == check2
 
 
+# ---------------------------------------------------------------------------
+# Verhoeff checksum tables (for Aadhaar validation)
+# ---------------------------------------------------------------------------
+
+_VERHOEFF_D = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+    [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+    [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+    [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+    [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+    [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+    [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+    [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+    [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+]
+_VERHOEFF_INV = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9]
+_VERHOEFF_P = [
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+    [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+    [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+    [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+    [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+    [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+    [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+]
+
+
+def _aadhaar_validate(text: str) -> bool:
+    """Validate an Aadhaar number using the Verhoeff checksum."""
+    digits = [int(c) for c in text if c in _ASCII_DIGITS]
+    if len(digits) != 12:
+        return False
+    # First digit must be 2-9 (Aadhaar doesn't start with 0 or 1)
+    if digits[0] < 2:
+        return False
+    # Verhoeff checksum
+    c = 0
+    for i, d in enumerate(reversed(digits)):
+        c = _VERHOEFF_D[c][_VERHOEFF_P[i % 8][d]]
+    return c == 0
+
+
 def _iban_validate(text: str) -> bool:
     """Validate an IBAN using the mod-97 algorithm (ISO 7064)."""
     # Remove spaces
@@ -237,6 +281,22 @@ def _partial_mask_eu_vat(m: re.Match[str], mc: str) -> str:
     last3 = text[-3:]
     middle_len = len(text) - 5
     return f"{prefix}{mc * middle_len}{last3}"
+
+
+def _partial_mask_aadhaar(m: re.Match[str], mc: str) -> str:
+    digits = [c for c in m.group() if c in _ASCII_DIGITS]
+    return f"{''.join(digits[:4])} {''.join(digits[4:8])} {mc * 4}"
+
+
+def _partial_mask_pan(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    return f"{text[:3]}{mc * 6}{text[-1]}"
+
+
+def _partial_mask_in_phone(m: re.Match[str], mc: str) -> str:
+    digits = [c for c in m.group() if c in _ASCII_DIGITS]
+    last4 = "".join(digits[-4:])
+    return f"{mc * 5} {mc * 5}-{last4}"
 
 
 def _partial_mask_generic_secret(m: re.Match[str], mc: str) -> str:
@@ -594,6 +654,55 @@ _EU_VAT = PatternEntry(
 )
 
 
+# --- Aadhaar (Indian 12-digit ID) ---
+# Matches spaced format only (XXXX XXXX XXXX) to minimize false positives.
+# First digit must be 2-9. Validated with Verhoeff checksum.
+_AADHAAR_RE = re.compile(r"\b[2-9][0-9]{3}[\s][0-9]{4}[\s][0-9]{4}\b")
+
+_AADHAAR = PatternEntry(
+    name="aadhaar",
+    regex=_AADHAAR_RE,
+    heuristic=None,
+    mask="[AADHAAR REDACTED]",
+    validator=_aadhaar_validate,
+    partial_masker=_partial_mask_aadhaar,
+)
+
+
+# --- PAN (Indian Permanent Account Number) ---
+# Format: 5 uppercase letters + 4 digits + 1 uppercase letter.
+# The 4th character is restricted to valid entity type codes (P, C, H, A, B, G, J, L, F, T).
+_PAN_RE = re.compile(r"\b[A-Z]{3}[ABCFGHLJPT][A-Z][0-9]{4}[A-Z]\b")
+
+_PAN = PatternEntry(
+    name="pan",
+    regex=_PAN_RE,
+    heuristic=None,
+    mask="[PAN REDACTED]",
+    partial_masker=_partial_mask_pan,
+)
+
+
+# --- Indian Phone ---
+# Matches Indian mobile numbers (10 digits starting with 6-9).
+# Optional +91 or 0 prefix. Supports spaces, dots, and dashes as separators.
+_IN_PHONE_RE = re.compile(
+    r"(?<![0-9])"
+    r"(?:\+91[\s.-]?)?"  # Optional +91 prefix
+    r"(?:0)?"  # Optional 0 prefix for STD
+    r"[6-9][0-9]{4}[\s.-]?[0-9]{5}"
+    r"(?![0-9])"
+)
+
+_IN_PHONE = PatternEntry(
+    name="in_phone",
+    regex=_IN_PHONE_RE,
+    heuristic=None,
+    mask="[IN_PHONE REDACTED]",
+    partial_masker=_partial_mask_in_phone,
+)
+
+
 # --- Generic Secret ---
 # Context-dependent: matches values after common secret-related labels.
 # Replaces the entire match (label + value) to avoid leaking context.
@@ -641,6 +750,7 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
     - IPv6 before IPv4 to catch ::ffff:x.x.x.x mapped addresses first
     - CPF/CNPJ/BR phone after IPv4 — formatted with check digits, specific enough
     - IBAN/EU VAT after BR patterns — validated with mod-97 / prefix matching
+    - Aadhaar/PAN/IN phone after EU patterns — Verhoeff-validated / prefix-restricted
     - Context-dependent patterns (generic_secret) before general patterns (email)
       because email redaction inserts spaces that break generic_secret's ``\\S{8,128}``
     - Broadest patterns (email, phone) last to avoid consuming text needed by
@@ -662,6 +772,9 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
         _BR_PHONE,
         _IBAN,
         _EU_VAT,
+        _AADHAAR,
+        _PAN,
+        _IN_PHONE,
         _GENERIC_SECRET,
         _EMAIL,
         _PHONE,
