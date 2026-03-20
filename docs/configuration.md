@@ -55,6 +55,9 @@ A frozenset of built-in pattern names to skip. Available names:
 | `br_phone` | Brazilian phone numbers |
 | `iban` | International bank account numbers (mod-97 validated) |
 | `eu_vat` | EU VAT numbers (country-prefixed) |
+| `aadhaar` | Indian Aadhaar numbers (Verhoeff checksum validated) |
+| `pan` | Indian PAN numbers (entity type validated) |
+| `in_phone` | Indian mobile phone numbers |
 | `generic_secret` | Generic secrets (label-based) |
 
 ### `mask_style`

@@ -172,9 +172,9 @@
 - [x] EU VAT numbers (country-prefixed)
 
 **India (`hushlog[in]`):**
-- [ ] Aadhaar (12 digits with Verhoeff checksum)
-- [ ] PAN (`XXXXX0000X` format)
-- [ ] Indian phone numbers (+91 formats)
+- [x] Aadhaar (12 digits with Verhoeff checksum)
+- [x] PAN (`XXXXX0000X` format)
+- [x] Indian phone numbers (+91 formats)
 
 **Canada (`hushlog[ca]`):**
 - [ ] SIN (`XXX-XXX-XXX` with Luhn validation)

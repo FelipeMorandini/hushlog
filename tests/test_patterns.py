@@ -7,6 +7,7 @@ import re
 import pytest
 
 from hushlog._patterns import (
+    _AADHAAR,
     _AWS_ACCESS_KEY,
     _AWS_SECRET_KEY,
     _BR_PHONE,
@@ -19,12 +20,15 @@ from hushlog._patterns import (
     _GENERIC_SECRET,
     _GITHUB_TOKEN,
     _IBAN,
+    _IN_PHONE,
     _IPV4,
     _IPV6,
     _JWT,
+    _PAN,
     _PHONE,
     _SSN,
     _STRIPE_KEY,
+    _aadhaar_validate,
     _cnpj_validate,
     _cpf_validate,
     _iban_validate,
@@ -49,7 +53,7 @@ class TestGetBuiltinPatterns:
         assert isinstance(result, tuple)
 
     def test_count(self) -> None:
-        assert len(get_builtin_patterns()) == 18
+        assert len(get_builtin_patterns()) == 21
 
     def test_all_are_pattern_entries(self) -> None:
         for entry in get_builtin_patterns():
@@ -74,6 +78,9 @@ class TestGetBuiltinPatterns:
             "br_phone",
             "iban",
             "eu_vat",
+            "aadhaar",
+            "pan",
+            "in_phone",
             "generic_secret",
             "email",
             "phone",
@@ -1799,3 +1806,189 @@ class TestEUVATPattern:
     def test_no_heuristic(self) -> None:
         """EU VAT has no heuristic (None)."""
         assert _EU_VAT.heuristic is None
+
+
+# ---------------------------------------------------------------------------
+# Aadhaar validator
+# ---------------------------------------------------------------------------
+
+
+class TestAadhaarValidator:
+    """Validate the Verhoeff checksum implementation for Aadhaar."""
+
+    def test_valid_aadhaar_number(self) -> None:
+        """Known-valid Aadhaar passes Verhoeff checksum."""
+        assert _aadhaar_validate("2345 6789 0124") is True
+
+    def test_valid_aadhaar_number_alt(self) -> None:
+        """Another valid Aadhaar passes Verhoeff checksum."""
+        assert _aadhaar_validate("9876 5432 1012") is True
+
+    def test_invalid_checksum(self) -> None:
+        """Off-by-one from valid Aadhaar fails Verhoeff."""
+        assert _aadhaar_validate("2345 6789 0125") is False
+
+    def test_first_digit_zero_rejected(self) -> None:
+        """Aadhaar starting with 0 is invalid."""
+        assert _aadhaar_validate("0345 6789 0124") is False
+
+    def test_first_digit_one_rejected(self) -> None:
+        """Aadhaar starting with 1 is invalid."""
+        assert _aadhaar_validate("1345 6789 0124") is False
+
+    def test_wrong_length(self) -> None:
+        """Non-12-digit input is invalid."""
+        assert _aadhaar_validate("2345 6789") is False
+
+
+# ---------------------------------------------------------------------------
+# Aadhaar pattern
+# ---------------------------------------------------------------------------
+
+
+class TestAadhaarPattern:
+    """Test Aadhaar pattern matching and redaction."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_AADHAAR)
+        return registry.redact(text)
+
+    def test_spaced_format_matched(self) -> None:
+        result = self._redact("Aadhaar: 2345 6789 0124")
+        assert "[AADHAAR REDACTED]" in result
+        assert "2345 6789 0124" not in result
+
+    def test_invalid_checksum_not_matched(self) -> None:
+        """Aadhaar with invalid Verhoeff checksum should NOT be redacted."""
+        result = self._redact("Aadhaar: 2345 6789 0125")
+        assert "[AADHAAR REDACTED]" not in result
+        assert "2345 6789 0125" in result
+
+    def test_first_digit_zero_not_matched(self) -> None:
+        """Aadhaar starting with 0 should NOT match the regex."""
+        result = self._redact("ID: 0345 6789 0124")
+        assert "[AADHAAR REDACTED]" not in result
+
+    def test_first_digit_one_not_matched(self) -> None:
+        """Aadhaar starting with 1 should NOT match the regex."""
+        result = self._redact("ID: 1345 6789 0124")
+        assert "[AADHAAR REDACTED]" not in result
+
+    def test_unspaced_format_not_matched(self) -> None:
+        """Unspaced 12-digit number should NOT match (MVP: spaced only)."""
+        result = self._redact("ID: 234567890124")
+        assert "[AADHAAR REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("Aadhaar: 2345 6789 0124")
+        # First 8 digits visible, last 4 masked
+        assert "2345 6789 ****" in result
+        assert "2345 6789 0124" not in result
+
+
+# ---------------------------------------------------------------------------
+# PAN pattern
+# ---------------------------------------------------------------------------
+
+
+class TestPANPattern:
+    """Test PAN (Indian Permanent Account Number) pattern."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_PAN)
+        return registry.redact(text)
+
+    def test_valid_pan_person(self) -> None:
+        result = self._redact("PAN: BNZPM2501F")
+        assert "[PAN REDACTED]" in result
+        assert "BNZPM2501F" not in result
+
+    def test_valid_pan_company(self) -> None:
+        result = self._redact("PAN: ABCCM1234N")
+        assert "[PAN REDACTED]" in result
+        assert "ABCCM1234N" not in result
+
+    def test_valid_pan_trust(self) -> None:
+        result = self._redact("PAN: AABTN5678K")
+        assert "[PAN REDACTED]" in result
+
+    def test_invalid_entity_type_not_matched(self) -> None:
+        """4th character not in valid entity types should NOT match."""
+        result = self._redact("PAN: ABCDM1234N")
+        assert "[PAN REDACTED]" not in result
+        assert "ABCDM1234N" in result
+
+    def test_lowercase_not_matched(self) -> None:
+        """Lowercase letters should NOT match."""
+        result = self._redact("PAN: bnzpm2501f")
+        assert "[PAN REDACTED]" not in result
+
+    def test_too_short_not_matched(self) -> None:
+        result = self._redact("PAN: BNZPM250")
+        assert "[PAN REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("PAN: BNZPM2501F")
+        # Show first 3 + last 1, mask middle 6
+        assert "BNZ******F" in result
+        assert "BNZPM2501F" not in result
+
+
+# ---------------------------------------------------------------------------
+# Indian Phone pattern
+# ---------------------------------------------------------------------------
+
+
+class TestINPhonePattern:
+    """Test Indian phone number pattern."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_IN_PHONE)
+        return registry.redact(text)
+
+    def test_with_plus91_prefix(self) -> None:
+        result = self._redact("Call +91 98765 43210")
+        assert "[IN_PHONE REDACTED]" in result
+        assert "98765 43210" not in result
+
+    def test_without_prefix(self) -> None:
+        result = self._redact("Call 98765 43210")
+        assert "[IN_PHONE REDACTED]" in result
+
+    def test_with_zero_prefix(self) -> None:
+        result = self._redact("Call 09876543210")
+        assert "[IN_PHONE REDACTED]" in result
+
+    def test_with_plus91_no_space(self) -> None:
+        result = self._redact("Call +919876543210")
+        assert "[IN_PHONE REDACTED]" in result
+
+    def test_with_dashes(self) -> None:
+        result = self._redact("Call +91-98765-43210")
+        assert "[IN_PHONE REDACTED]" in result
+
+    def test_invalid_start_digit_not_matched(self) -> None:
+        """Indian mobile numbers start with 6-9; 5 should NOT match."""
+        result = self._redact("Call 5876543210")
+        assert "[IN_PHONE REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("Call +91 98765 43210")
+        # Show last 4 digits
+        assert "3210" in result
+        assert "98765" not in result

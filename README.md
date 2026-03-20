@@ -75,6 +75,9 @@ HushLog wraps your existing logging formatters with a `RedactingFormatter` that 
 | BR Phone | `(11) 91234-5678` | `[BR_PHONE REDACTED]` | Brazilian mobile/landline, optional +55 prefix |
 | IBAN | `GB29 NWBK 6016 1331 9268 19` | `[IBAN REDACTED]` | International bank account number, mod-97 validated |
 | EU VAT | `DE123456789` | `[EU_VAT REDACTED]` | EU VAT numbers with country prefix |
+| Aadhaar | `2345 6789 0124` | `[AADHAAR REDACTED]` | Indian 12-digit ID, Verhoeff checksum validated |
+| PAN | `BNZPM2501F` | `[PAN REDACTED]` | Indian Permanent Account Number, entity type validated |
+| IN Phone | `+91 98765 43210` | `[IN_PHONE REDACTED]` | Indian mobile numbers, optional +91/0 prefix |
 
 ## Configuration
 
