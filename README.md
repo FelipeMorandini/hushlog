@@ -228,10 +228,6 @@ HushLog uses **regex-based pattern matching** for PII detection. This is a best-
 
 For high-security environments, combine HushLog with additional controls (log access restrictions, encryption at rest, audit logging).
 
-## Planned
-
-Production hardening, docs site, and more. See the [roadmap](ROADMAP.md) for details.
-
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
