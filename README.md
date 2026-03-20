@@ -78,6 +78,9 @@ HushLog wraps your existing logging formatters with a `RedactingFormatter` that 
 | Aadhaar | `2345 6789 0124` | `[AADHAAR REDACTED]` | Indian 12-digit ID, Verhoeff checksum validated |
 | PAN | `BNZPM2501F` | `[PAN REDACTED]` | Indian Permanent Account Number, entity type validated |
 | IN Phone | `+91 98765 43210` | `[IN_PHONE REDACTED]` | Indian mobile numbers, optional +91/0 prefix |
+| SIN | `130-692-544` | `[SIN REDACTED]` | Canadian Social Insurance Number, Luhn validated |
+| E.164 Phone | `+44 7911 123456` | `[E164_PHONE REDACTED]` | International phone numbers, 8-15 digits |
+| SWIFT/BIC | `DEUTDEFF` | `[SWIFT REDACTED]` | Bank identifier codes, 8 or 11 characters |
 
 ## Configuration
 
@@ -211,7 +214,7 @@ Calling `unpatch()` without a prior `patch()` is safe (no-op). Calling `patch()`
 - Only handlers present on the **root logger** at `patch()` time are wrapped. Handlers added later will not be redacted.
 - Named loggers with `propagate=False` and their own handlers bypass root-level redaction.
 - For structlog/loguru, use the dedicated integrations (`structlog_processor`, `loguru_sink`) instead of `patch()`.
-- Phone detection is US NANP only.
+- Phone detection covers US NANP, Brazilian, Indian, and E.164 international formats.
 
 ## Security Model
 

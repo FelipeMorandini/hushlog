@@ -113,6 +113,31 @@ _VERHOEFF_P = [
 ]
 
 
+def _sin_validate(text: str) -> bool:
+    """Validate a Canadian SIN using the Luhn algorithm."""
+    digits = [int(c) for c in text if c in _ASCII_DIGITS]
+    if len(digits) != 9:
+        return False
+    # SIN cannot start with 0 or 8
+    if digits[0] in (0, 8):
+        return False
+    # Luhn checksum
+    checksum = 0
+    for i, d in enumerate(reversed(digits)):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        checksum += d
+    return checksum % 10 == 0
+
+
+def _e164_validate(text: str) -> bool:
+    """Validate an E.164 phone number has 8-15 digits after the +."""
+    digits = [c for c in text if c in _ASCII_DIGITS]
+    return 8 <= len(digits) <= 15
+
+
 def _aadhaar_validate(text: str) -> bool:
     """Validate an Aadhaar number using the Verhoeff checksum."""
     digits = [int(c) for c in text if c in _ASCII_DIGITS]
@@ -297,6 +322,29 @@ def _partial_mask_in_phone(m: re.Match[str], mc: str) -> str:
     digits = [c for c in m.group() if c in _ASCII_DIGITS]
     last4 = "".join(digits[-4:])
     return f"{mc * 5} {mc * 5}-{last4}"
+
+
+def _partial_mask_sin(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    last3 = text[-3:]
+    return f"{mc * 3}-{mc * 3}-{last3}"
+
+
+def _partial_mask_e164(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    digits = [c for c in text if c in _ASCII_DIGITS]
+    last4 = "".join(digits[-4:])
+    # Show + and first 2 digits (country code approximation)
+    cc = "".join(digits[:2])
+    return f"+{cc} {mc * 4} {mc * 4} {last4}"
+
+
+def _partial_mask_swift(m: re.Match[str], mc: str) -> str:
+    text = m.group()
+    bank = text[:4]
+    country = text[4:6]
+    rest_len = len(text) - 6
+    return f"{bank}{country}{mc * rest_len}"
 
 
 def _partial_mask_generic_secret(m: re.Match[str], mc: str) -> str:
@@ -703,6 +751,325 @@ _IN_PHONE = PatternEntry(
 )
 
 
+# --- Canadian SIN ---
+# Matches XXX-XXX-XXX format (dashed only). First digit 1-7 or 9.
+# Validated with Luhn checksum (same algorithm as credit cards, but 9 digits).
+_SIN_RE = re.compile(r"\b[1-79][0-9]{2}-[0-9]{3}-[0-9]{3}\b")
+
+_SIN = PatternEntry(
+    name="sin",
+    regex=_SIN_RE,
+    heuristic=lambda text: "-" in text,
+    mask="[SIN REDACTED]",
+    validator=_sin_validate,
+    partial_masker=_partial_mask_sin,
+)
+
+
+# --- E.164 International Phone ---
+# Matches international phone numbers in E.164 format: + followed by 8-15 digits.
+# Country-specific patterns (US, BR, IN) run before this and catch their formats first.
+# E.164 catches remaining international numbers.
+_E164_PHONE_RE = re.compile(
+    r"(?<![0-9])"
+    r"\+[1-9][0-9]{0,2}"  # Country code (1-3 digits)
+    r"(?:[\s.-]?[0-9]{1,5}){1,4}"  # Subscriber groups
+    r"(?![0-9])"
+)
+
+_E164_PHONE = PatternEntry(
+    name="e164_phone",
+    regex=_E164_PHONE_RE,
+    heuristic=lambda text: "+" in text,
+    mask="[E164_PHONE REDACTED]",
+    validator=_e164_validate,
+    partial_masker=_partial_mask_e164,
+)
+
+
+# --- SWIFT/BIC Code ---
+# Matches 8 or 11 character SWIFT/BIC codes.
+# Structure: 4 letter bank code + 2 letter country (ISO 3166-1) + 2 alphanumeric location
+# + optional 3 alphanumeric branch code.
+# Validated: chars 5-6 must be a valid ISO 3166-1 alpha-2 country code to reduce false positives.
+_SWIFT_RE = re.compile(r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b")
+
+# ISO 3166-1 alpha-2 country codes used in SWIFT/BIC
+_SWIFT_COUNTRY_CODES = frozenset(
+    {
+        "AD",
+        "AE",
+        "AF",
+        "AG",
+        "AI",
+        "AL",
+        "AM",
+        "AO",
+        "AQ",
+        "AR",
+        "AS",
+        "AT",
+        "AU",
+        "AW",
+        "AX",
+        "AZ",
+        "BA",
+        "BB",
+        "BD",
+        "BE",
+        "BF",
+        "BG",
+        "BH",
+        "BI",
+        "BJ",
+        "BL",
+        "BM",
+        "BN",
+        "BO",
+        "BQ",
+        "BR",
+        "BS",
+        "BT",
+        "BV",
+        "BW",
+        "BY",
+        "BZ",
+        "CA",
+        "CC",
+        "CD",
+        "CF",
+        "CG",
+        "CH",
+        "CI",
+        "CK",
+        "CL",
+        "CM",
+        "CN",
+        "CO",
+        "CR",
+        "CU",
+        "CV",
+        "CW",
+        "CX",
+        "CY",
+        "CZ",
+        "DE",
+        "DJ",
+        "DK",
+        "DM",
+        "DO",
+        "DZ",
+        "EC",
+        "EE",
+        "EG",
+        "EH",
+        "ER",
+        "ES",
+        "ET",
+        "FI",
+        "FJ",
+        "FK",
+        "FM",
+        "FO",
+        "FR",
+        "GA",
+        "GB",
+        "GD",
+        "GE",
+        "GF",
+        "GG",
+        "GH",
+        "GI",
+        "GL",
+        "GM",
+        "GN",
+        "GP",
+        "GQ",
+        "GR",
+        "GS",
+        "GT",
+        "GU",
+        "GW",
+        "GY",
+        "HK",
+        "HM",
+        "HN",
+        "HR",
+        "HT",
+        "HU",
+        "ID",
+        "IE",
+        "IL",
+        "IM",
+        "IN",
+        "IO",
+        "IQ",
+        "IR",
+        "IS",
+        "IT",
+        "JE",
+        "JM",
+        "JO",
+        "JP",
+        "KE",
+        "KG",
+        "KH",
+        "KI",
+        "KM",
+        "KN",
+        "KP",
+        "KR",
+        "KW",
+        "KY",
+        "KZ",
+        "LA",
+        "LB",
+        "LC",
+        "LI",
+        "LK",
+        "LR",
+        "LS",
+        "LT",
+        "LU",
+        "LV",
+        "LY",
+        "MA",
+        "MC",
+        "MD",
+        "ME",
+        "MF",
+        "MG",
+        "MH",
+        "MK",
+        "ML",
+        "MM",
+        "MN",
+        "MO",
+        "MP",
+        "MQ",
+        "MR",
+        "MS",
+        "MT",
+        "MU",
+        "MV",
+        "MW",
+        "MX",
+        "MY",
+        "MZ",
+        "NA",
+        "NC",
+        "NE",
+        "NF",
+        "NG",
+        "NI",
+        "NL",
+        "NO",
+        "NP",
+        "NR",
+        "NU",
+        "NZ",
+        "OM",
+        "PA",
+        "PE",
+        "PF",
+        "PG",
+        "PH",
+        "PK",
+        "PL",
+        "PM",
+        "PN",
+        "PR",
+        "PS",
+        "PT",
+        "PW",
+        "PY",
+        "QA",
+        "RE",
+        "RO",
+        "RS",
+        "RU",
+        "RW",
+        "SA",
+        "SB",
+        "SC",
+        "SD",
+        "SE",
+        "SG",
+        "SH",
+        "SI",
+        "SJ",
+        "SK",
+        "SL",
+        "SM",
+        "SN",
+        "SO",
+        "SR",
+        "SS",
+        "ST",
+        "SV",
+        "SX",
+        "SY",
+        "SZ",
+        "TC",
+        "TD",
+        "TF",
+        "TG",
+        "TH",
+        "TJ",
+        "TK",
+        "TL",
+        "TM",
+        "TN",
+        "TO",
+        "TR",
+        "TT",
+        "TV",
+        "TW",
+        "TZ",
+        "UA",
+        "UG",
+        "UM",
+        "US",
+        "UY",
+        "UZ",
+        "VA",
+        "VC",
+        "VE",
+        "VG",
+        "VI",
+        "VN",
+        "VU",
+        "WF",
+        "WS",
+        "XK",
+        "YE",
+        "YT",
+        "ZA",
+        "ZM",
+        "ZW",
+    }
+)
+
+
+def _swift_validate(text: str) -> bool:
+    """Validate a SWIFT/BIC code: chars 5-6 must be a valid ISO 3166-1 country code."""
+    cleaned = text.strip()
+    if len(cleaned) not in (8, 11):
+        return False
+    country = cleaned[4:6]
+    return country in _SWIFT_COUNTRY_CODES
+
+
+_SWIFT = PatternEntry(
+    name="swift",
+    regex=_SWIFT_RE,
+    heuristic=None,
+    mask="[SWIFT REDACTED]",
+    validator=_swift_validate,
+    partial_masker=_partial_mask_swift,
+)
+
+
 # --- Generic Secret ---
 # Context-dependent: matches values after common secret-related labels.
 # Replaces the entire match (label + value) to avoid leaking context.
@@ -751,6 +1118,9 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
     - CPF/CNPJ/BR phone after IPv4 — formatted with check digits, specific enough
     - IBAN/EU VAT after BR patterns — validated with mod-97 / prefix matching
     - Aadhaar/PAN/IN phone after EU patterns — Verhoeff-validated / prefix-restricted
+    - SIN after India patterns — Luhn-validated, dashed format only
+    - E.164 after country-specific phone patterns — catches remaining international numbers
+    - SWIFT/BIC after E.164 — uppercase 8/11-char codes, structural regex
     - Context-dependent patterns (generic_secret) before general patterns (email)
       because email redaction inserts spaces that break generic_secret's ``\\S{8,128}``
     - Broadest patterns (email, phone) last to avoid consuming text needed by
@@ -775,6 +1145,9 @@ def get_builtin_patterns() -> tuple[PatternEntry, ...]:
         _AADHAAR,
         _PAN,
         _IN_PHONE,
+        _SIN,
+        _E164_PHONE,
+        _SWIFT,
         _GENERIC_SECRET,
         _EMAIL,
         _PHONE,
