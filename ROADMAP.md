@@ -177,13 +177,13 @@
 - [x] Indian phone numbers (+91 formats)
 
 **Canada (`hushlog[ca]`):**
-- [ ] SIN (`XXX-XXX-XXX` with Luhn validation)
-- [ ] Canadian phone numbers (+1, same NANP as US — already covered)
+- [x] SIN (`XXX-XXX-XXX` with Luhn validation)
+- [x] Canadian phone numbers (+1, same NANP as US — already covered by US phone pattern)
 
 **International:**
-- [ ] E.164 phone numbers (global format: `+` country code + subscriber)
-- [ ] Passport numbers (per-country regex with configurable country set)
-- [ ] SWIFT/BIC codes (8 or 11 alphanumeric)
+- [x] E.164 phone numbers (global format: `+` country code + subscriber)
+- [ ] Passport numbers (per-country regex with configurable country set) — deferred, requires per-country format database
+- [x] SWIFT/BIC codes (8 or 11 alphanumeric)
 
 ### Architecture
 - Region packs register additional `PatternEntry` objects via a plugin mechanism

@@ -14,6 +14,7 @@ from hushlog._patterns import (
     _CNPJ,
     _CPF,
     _CREDIT_CARD,
+    _E164_PHONE,
     _EMAIL,
     _EU_VAT,
     _GCP_KEY,
@@ -26,15 +27,19 @@ from hushlog._patterns import (
     _JWT,
     _PAN,
     _PHONE,
+    _SIN,
     _SSN,
     _STRIPE_KEY,
+    _SWIFT,
     _aadhaar_validate,
     _cnpj_validate,
     _cpf_validate,
+    _e164_validate,
     _iban_validate,
     _ipv4_validate,
     _ipv6_validate,
     _luhn_check,
+    _sin_validate,
     get_builtin_patterns,
 )
 from hushlog._registry import PatternRegistry
@@ -53,7 +58,7 @@ class TestGetBuiltinPatterns:
         assert isinstance(result, tuple)
 
     def test_count(self) -> None:
-        assert len(get_builtin_patterns()) == 21
+        assert len(get_builtin_patterns()) == 24
 
     def test_all_are_pattern_entries(self) -> None:
         for entry in get_builtin_patterns():
@@ -81,6 +86,9 @@ class TestGetBuiltinPatterns:
             "aadhaar",
             "pan",
             "in_phone",
+            "sin",
+            "e164_phone",
+            "swift",
             "generic_secret",
             "email",
             "phone",
@@ -1992,3 +2000,208 @@ class TestINPhonePattern:
         # Show last 4 digits
         assert "3210" in result
         assert "98765" not in result
+
+
+# ---------------------------------------------------------------------------
+# SIN validator
+# ---------------------------------------------------------------------------
+
+
+class TestSINValidator:
+    """Validate the Canadian SIN Luhn implementation."""
+
+    def test_valid_sin(self) -> None:
+        """130-692-544 is a valid SIN (starts with 1, passes Luhn)."""
+        assert _sin_validate("130-692-544") is True
+
+    def test_invalid_luhn(self) -> None:
+        """Off-by-one digit should fail Luhn."""
+        assert _sin_validate("130-692-545") is False
+
+    def test_starts_with_zero_rejected(self) -> None:
+        """SIN cannot start with 0."""
+        assert _sin_validate("046-454-286") is False
+
+    def test_starts_with_eight_rejected(self) -> None:
+        """SIN cannot start with 8."""
+        assert _sin_validate("812-345-678") is False
+
+    def test_wrong_length_rejected(self) -> None:
+        """Too few or too many digits should fail."""
+        assert _sin_validate("123-456") is False
+        assert _sin_validate("123-456-789-0") is False
+
+
+# ---------------------------------------------------------------------------
+# SIN pattern
+# ---------------------------------------------------------------------------
+
+
+class TestSINPattern:
+    """Test Canadian SIN regex, heuristic, and partial mask."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_SIN)
+        return registry.redact(text)
+
+    def test_valid_sin_redacted(self) -> None:
+        """A valid SIN in XXX-XXX-XXX format should be redacted."""
+        # 130-692-544 passes Luhn: digits 1,3,0,6,9,2,5,4,4
+        result = self._redact("SIN: 130-692-544")
+        assert "[SIN REDACTED]" in result
+        assert "130-692-544" not in result
+
+    def test_invalid_luhn_not_redacted(self) -> None:
+        """A SIN that fails Luhn should NOT be redacted."""
+        result = self._redact("SIN: 130-692-545")
+        assert "[SIN REDACTED]" not in result
+        assert "130-692-545" in result
+
+    def test_starts_with_zero_not_matched(self) -> None:
+        """SIN starting with 0 should fail validation."""
+        result = self._redact("SIN: 046-454-286")
+        # Regex requires first digit 1-7 or 9, so 0 won't match regex
+        assert "[SIN REDACTED]" not in result
+
+    def test_starts_with_eight_not_matched(self) -> None:
+        """SIN starting with 8 should fail regex (first digit 1-7 or 9)."""
+        result = self._redact("SIN: 812-345-678")
+        assert "[SIN REDACTED]" not in result
+
+    def test_heuristic(self) -> None:
+        assert _SIN.heuristic is not None
+        assert _SIN.heuristic("no dash here") is False
+        assert _SIN.heuristic("SIN: 130-692-544") is True
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("SIN: 130-692-544")
+        # Partial mask shows last 3: ***-***-544
+        assert "544" in result
+        assert "130" not in result
+
+
+# ---------------------------------------------------------------------------
+# E.164 International Phone validator
+# ---------------------------------------------------------------------------
+
+
+class TestE164Validator:
+    """Validate E.164 digit count check."""
+
+    def test_valid_8_digits(self) -> None:
+        assert _e164_validate("+35312345") is True  # 8 digits
+
+    def test_valid_15_digits(self) -> None:
+        assert _e164_validate("+123456789012345") is True  # 15 digits
+
+    def test_too_short(self) -> None:
+        assert _e164_validate("+1234567") is False  # 7 digits
+
+    def test_too_long(self) -> None:
+        assert _e164_validate("+1234567890123456") is False  # 16 digits
+
+
+# ---------------------------------------------------------------------------
+# E.164 International Phone pattern
+# ---------------------------------------------------------------------------
+
+
+class TestE164PhonePattern:
+    """Test E.164 international phone regex, heuristic, and partial mask."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_E164_PHONE)
+        return registry.redact(text)
+
+    def test_uk_phone(self) -> None:
+        result = self._redact("Call +44 7911 123456")
+        assert "[E164_PHONE REDACTED]" in result
+        assert "7911 123456" not in result
+
+    def test_german_phone(self) -> None:
+        result = self._redact("Call +49 30 12345678")
+        assert "[E164_PHONE REDACTED]" in result
+
+    def test_china_phone(self) -> None:
+        result = self._redact("Call +86 139 1234 5678")
+        assert "[E164_PHONE REDACTED]" in result
+
+    def test_compact_format(self) -> None:
+        result = self._redact("Call +441234567890")
+        assert "[E164_PHONE REDACTED]" in result
+
+    def test_too_short_rejected(self) -> None:
+        """Numbers with fewer than 8 digits after + should NOT match."""
+        result = self._redact("Call +1234567")
+        assert "[E164_PHONE REDACTED]" not in result
+
+    def test_heuristic(self) -> None:
+        assert _E164_PHONE.heuristic is not None
+        assert _E164_PHONE.heuristic("no plus here") is False
+        assert _E164_PHONE.heuristic("Call +44 7911 123456") is True
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("Call +44 7911 123456")
+        # Partial mask shows country code + last 4
+        assert "3456" in result
+        assert "7911" not in result
+
+
+# ---------------------------------------------------------------------------
+# SWIFT/BIC pattern
+# ---------------------------------------------------------------------------
+
+
+class TestSWIFTPattern:
+    """Test SWIFT/BIC code regex and partial mask."""
+
+    def _redact(self, text: str) -> str:
+        registry = PatternRegistry()
+        registry.register(_SWIFT)
+        return registry.redact(text)
+
+    def test_8_char_swift(self) -> None:
+        result = self._redact("Bank: DEUTDEFF")
+        assert "[SWIFT REDACTED]" in result
+        assert "DEUTDEFF" not in result
+
+    def test_11_char_swift(self) -> None:
+        result = self._redact("Bank: COBADEFFXXX")
+        assert "[SWIFT REDACTED]" in result
+        assert "COBADEFFXXX" not in result
+
+    def test_another_valid_swift(self) -> None:
+        result = self._redact("Bank: BNPAFRPP")
+        assert "[SWIFT REDACTED]" in result
+
+    def test_lowercase_not_matched(self) -> None:
+        """Lowercase SWIFT codes should NOT match."""
+        result = self._redact("Bank: deutdeff")
+        assert "[SWIFT REDACTED]" not in result
+
+    def test_wrong_length_not_matched(self) -> None:
+        """9 or 10 char codes should NOT match (must be 8 or 11)."""
+        result = self._redact("Bank: DEUTDEFFX")
+        assert "[SWIFT REDACTED]" not in result
+        result = self._redact("Bank: DEUTDEFFXX")
+        assert "[SWIFT REDACTED]" not in result
+
+    def test_partial_mask(self) -> None:
+        from hushlog._config import Config
+
+        config = Config(mask_style="partial", mask_character="*")
+        registry = PatternRegistry.from_config(config)
+        result = registry.redact("Bank: DEUTDEFF")
+        # Partial mask shows bank code + country: DEUTDE**
+        assert "DEUT" in result
+        assert "DE" in result

@@ -180,13 +180,13 @@ class TestFromConfig:
         config = Config(custom_patterns={"digits": r"\d+"})
         registry = PatternRegistry.from_config(config)
         assert "digits" in registry
-        assert len(registry) == 22  # 21 builtins + 1 custom
+        assert len(registry) == 25  # 24 builtins + 1 custom
 
     def test_from_config_disable_patterns_code_path(self) -> None:
         """disable_patterns should remove matching built-in patterns."""
         config = Config(disable_patterns=frozenset({"email", "ssn"}))
         registry = PatternRegistry.from_config(config)
-        assert len(registry) == 19  # 21 builtins - 2 disabled
+        assert len(registry) == 22  # 24 builtins - 2 disabled
         assert "email" not in registry
         assert "ssn" not in registry
 
@@ -194,7 +194,7 @@ class TestFromConfig:
         """Default Config should produce a registry with all built-in patterns."""
         config = Config()
         registry = PatternRegistry.from_config(config)
-        assert len(registry) == 21
+        assert len(registry) == 24
 
     def test_from_config_multiple_custom_patterns(self) -> None:
         """Multiple custom patterns should all be registered."""
@@ -205,7 +205,7 @@ class TestFromConfig:
             }
         )
         registry = PatternRegistry.from_config(config)
-        assert len(registry) == 23  # 21 builtins + 2 custom
+        assert len(registry) == 26  # 24 builtins + 2 custom
         assert "digits" in registry
         assert "vowels" in registry
 
